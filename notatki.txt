@@ -1,0 +1,10 @@
+python -m venv env - tworzy niezależne środowisko
+source env/bin/activate - uruchamia niezalezne środowisko
+sudo my_env/bin/python3 "%f" - kompilacja w niezależnym środowisku (konfiguracja Geany)
+ls -la /dev/tty* - lista portów tty
+pinctrl get | grep -E "RX|TX" - przypisanie portów
+sudo pinctrl set 14 op - ustawia GPIO14 na output
+pinctrl funcs 14 - wyświetli możliwe funkcje dla pinu
+dmesg -T | grep tty  - komunikaty o stanie urządzeń usb
+stty -F /dev/ttyAMA0 - info o porcie
+i2cdetect -y 1 - skanowanie magistrali SDI
