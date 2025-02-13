@@ -1,0 +1,27 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Start sync.sh",
+            "type": "shell",
+            "command": "/bin/bash",
+            "args": ["/Users/piotradamczyk/Projects/Piecyk/sync.sh"],
+            "problemMatcher": [],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "Run Python on RPi",
+            "type": "shell",
+            "command": "ssh",
+            "args": [
+                "-X",
+                "piotradamczyk@192.168.0.234",
+                "/usr/bin/python3 ${file}"
+            ],
+            "problemMatcher": []
+        }
+    ]
+}
