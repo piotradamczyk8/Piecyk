@@ -28,6 +28,7 @@ cycle_var = tk.DoubleVar(value="0.0")
 temperature = tk.DoubleVar(value="0.0")
 bottom_cover_temperature = tk.DoubleVar(value="0.0")
 humidity = tk.DoubleVar(value="0.0")
+currentTime = tk.DoubleVar(value="0.0")
 
 
 # Ustawienia GPIO
@@ -49,7 +50,7 @@ def triac_pin_set_zero():
     lgpio.gpio_write(h, TRIAC_PIN, 0)  
 
 def regulation_desk():        
-    root.geometry("640x480")
+    root.geometry("640x640")
     root.title("Sterowanie Piecykiem")
     
     def set_impulses():
@@ -74,47 +75,51 @@ def regulation_desk():
     frame.pack(pady=(10, 10))
 
 
-    tk.Label(frame, text="Frequency:", anchor="center").grid(row=0, column=0, padx=(10, 10),  pady=(10, 10))
-    tk.Label(frame, textvariable=freq_var, anchor="center").grid(row=0, column=1, padx=(10, 10),  pady=(10, 10))
 
-    tk.Label(frame, text="Cycle:", anchor="center").grid(row=1, column=0, padx=(10, 10))
-    tk.Label(frame, textvariable=cycle_var, anchor="center").grid(row=1, column=1, padx=(10, 10))
+    tk.Label(frame, text="Time:", anchor="center").grid(row=0, column=0, padx=(10, 10),  pady=(10, 10))
+    tk.Label(frame, textvariable=currentTime, anchor="center").grid(row=0, column=1, padx=(10, 10),  pady=(10, 10))
 
-    tk.Label(frame, text="TRIAC OFF (ms):", anchor="center").grid(row=2, column=0, padx=(10, 10), pady=(10, 10))
+    tk.Label(frame, text="Frequency:", anchor="center").grid(row=1, column=0, padx=(10, 10),  pady=(10, 10))
+    tk.Label(frame, textvariable=freq_var, anchor="center").grid(row=1, column=1, padx=(10, 10),  pady=(10, 10))
+
+    tk.Label(frame, text="Cycle:", anchor="center").grid(row=2, column=0, padx=(10, 10))
+    tk.Label(frame, textvariable=cycle_var, anchor="center").grid(row=2, column=1, padx=(10, 10))
+
+    tk.Label(frame, text="TRIAC OFF (ms):", anchor="center").grid(row=3, column=0, padx=(10, 10), pady=(10, 10))
     impulse_prev_var = tk.DoubleVar(value=0)
     spinbox_impulse_prev = tk.Spinbox(frame, from_=0, to=5000, increment=1, textvariable=impulse_prev_var, width=5)
-    spinbox_impulse_prev.grid(row=2, column=1, padx=(10, 10), pady=(10, 10))
+    spinbox_impulse_prev.grid(row=3, column=1, padx=(10, 10), pady=(10, 10))
 
-    tk.Label(frame, text="TRIAC ON (ms):", anchor="center").grid(row=3, column=0, padx=(10, 10), pady=(10, 10))
+    tk.Label(frame, text="TRIAC ON (ms):", anchor="center").grid(row=4, column=0, padx=(10, 10), pady=(10, 10))
     impulse_after_var = tk.DoubleVar(value=0)
     spinbox_impulse_after = tk.Spinbox(frame, from_=0, to=5000, increment=1, textvariable=impulse_after_var, width=5)
-    spinbox_impulse_after.grid(row=3, column=1, padx=(10, 10), pady=(10, 10))
+    spinbox_impulse_after.grid(row=4, column=1, padx=(10, 10), pady=(10, 10))
 
-    tk.Button(frame, text="CLEAR", command=clear_inputs, anchor="center").grid(row=3, column=2, padx=(10, 10), pady=(10, 10))
-    tk.Button(frame, text="SET", command=set_inputs, anchor="center").grid(row=3, column=3, padx=(10, 10), pady=(10, 10))
+    tk.Button(frame, text="CLEAR", command=clear_inputs, anchor="center").grid(row=4, column=2, padx=(10, 10), pady=(10, 10))
+    tk.Button(frame, text="SET", command=set_inputs, anchor="center").grid(row=4, column=3, padx=(10, 10), pady=(10, 10))
 
-    tk.Label(frame, text="Voltage:", anchor="center").grid(row=4, column=0, padx=(10, 10), pady=(10, 10))
-    tk.Label(frame, textvariable=voltage_var, anchor="center").grid(row=4, column=1, padx=(10, 10), pady=(10, 10))
+    tk.Label(frame, text="Voltage:", anchor="center").grid(row=5, column=0, padx=(10, 10), pady=(10, 10))
+    tk.Label(frame, textvariable=voltage_var, anchor="center").grid(row=5, column=1, padx=(10, 10), pady=(10, 10))
         
-    tk.Label(frame, text="Current:", anchor="center").grid(row=5, column=0, padx=(10, 10), pady=(10, 10))
-    tk.Label(frame, textvariable=current_var, anchor="center").grid(row=5, column=1, padx=(10, 10), pady=(10, 10))
+    tk.Label(frame, text="Current:", anchor="center").grid(row=6, column=0, padx=(10, 10), pady=(10, 10))
+    tk.Label(frame, textvariable=current_var, anchor="center").grid(row=6, column=1, padx=(10, 10), pady=(10, 10))
 
     tk.Label(frame, text="Power:", anchor="center").grid(row=6, column=0, padx=(10, 10), pady=(10, 10))
     tk.Label(frame, textvariable=power_var, anchor="center").grid(row=6, column=1, padx=(10, 10), pady=(10, 10))
 
-    tk.Label(frame, text="Energy:", anchor="center").grid(row=7, column=0, padx=(10, 10), pady=(10, 10))
-    tk.Label(frame, textvariable=energy_var, anchor="center").grid(row=7, column=1, padx=(10, 10), pady=(10, 10))
+    tk.Label(frame, text="Energy:", anchor="center").grid(row=8, column=0, padx=(10, 10), pady=(10, 10))
+    tk.Label(frame, textvariable=energy_var, anchor="center").grid(row=8, column=1, padx=(10, 10), pady=(10, 10))
 
-    tk.Label(frame, text="Temperature:", anchor="center").grid(row=8, column=0, padx=(10, 10), pady=(10, 10))
-    tk.Label(frame, textvariable=temperature, anchor="center").grid(row=8, column=1, padx=(10, 10), pady=(10, 10))    
+    tk.Label(frame, text="Temperature:", anchor="center").grid(row=9, column=0, padx=(10, 10), pady=(10, 10))
+    tk.Label(frame, textvariable=temperature, anchor="center").grid(row=9, column=1, padx=(10, 10), pady=(10, 10))    
     
-    tk.Label(frame, text="Bottom Cover Temperature:", anchor="center").grid(row=9, column=0, padx=(10, 10), pady=(10, 10))
-    tk.Label(frame, textvariable=bottom_cover_temperature, anchor="center").grid(row=9, column=1, padx=(10, 10), pady=(10, 10))    
+    tk.Label(frame, text="Bottom Cover Temperature:", anchor="center").grid(row=10, column=0, padx=(10, 10), pady=(10, 10))
+    tk.Label(frame, textvariable=bottom_cover_temperature, anchor="center").grid(row=10, column=1, padx=(10, 10), pady=(10, 10))    
     
-    tk.Label(frame, text="Humidity:", anchor="center").grid(row=10, column=0, padx=(10, 10), pady=(10, 10))
-    tk.Label(frame, textvariable=humidity, anchor="center").grid(row=10, column=1, padx=(10, 10), pady=(10, 10))        
+    tk.Label(frame, text="Humidity:", anchor="center").grid(row=11, column=0, padx=(10, 10), pady=(10, 10))
+    tk.Label(frame, textvariable=humidity, anchor="center").grid(row=11, column=1, padx=(10, 10), pady=(10, 10))        
 
-    tk.Button(frame, text="FINISH", command=stop_program, anchor="center").grid(row=11, column=0, columnspan=4, padx=(10, 10), pady=(10, 10))    
+    tk.Button(frame, text="FINISH", command=stop_program, anchor="center").grid(row=12, column=0, columnspan=4, padx=(10, 10), pady=(10, 10))    
    
    
 # Funkcja do aktualizacji danych z PZEM-004T
@@ -132,11 +137,14 @@ def update_thermocouple_data(thermocouple):
     
 def update_temp_and_humidity(i2c):    
     sensor = adafruit_sht31d.SHT31D(i2c)
-    bottom_cover_temperature = sensor.temperature
-    humidity = sensor.relative_humidity
-
-    print(f"Temperatura: {temperature:.2f} °C")
-    print(f"Wilgotność: {humidity:.2f} %")
+    bottom_cover_temperature.set(f"{sensor.temperature:.2f}°C")
+    humidity.set(f"{sensor.relative_humidity:.2f}%")
+    
+def update_time(start_time):
+    elapsed_time = int(time.time() - start_time)
+    hours, remainder = divmod(elapsed_time, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    currentTime.set(f"{hours:02}:{minutes:02}:{seconds:02}")
 
 #############################
 # PROGRAM GŁÓWNY
@@ -160,6 +168,7 @@ regulation_desk()
 try:
     # Główna pętla programu
     start_time = time.time()
+    current_time = start_time
     while True:
         
         #Przejście przez zero
@@ -176,12 +185,13 @@ try:
         if lgpio.gpio_read(h, ZERO_CROSS_PIN) == 1:
             permision = 1
 
-        # Aktualizacja wskazań miernika PZEM-004T co 1/2 sekundy
-        if time.time() - start_time >= 0.5:            
+        # Aktualizacja wskazań miernika PZEM-004T co 1 sekundę
+        if time.time() - current_time >= 1:
             update_thermocouple_data(thermocouple)
             update_pzem_data(pzem)
             update_temp_and_humidity(i2c)
-            start_time = time.time()
+            update_time(start_time)
+            current_time = time.time()
 
         root.update_idletasks()
         root.update()          
