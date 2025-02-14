@@ -9,6 +9,7 @@ import busio
 import adafruit_sht31d
 import csv
 import numpy as np
+from PIDController import PIDController
 
 ##############################################
 # Stałe
@@ -24,6 +25,12 @@ def time_to_seconds(time_str):
     """Convert time in hh:mm format to seconds."""
     hours, minutes = map(int, time_str.split(':'))
     return hours * 3600 + minutes * 60
+
+def seconds_to_time(seconds):
+    """Convert seconds to time in hh:mm format."""
+    hours = seconds // 3600
+    minutes = (seconds % 3600) // 60
+    return f"{hours:02}:{minutes:02}"
 
 ##############################################
 # Zmienne globalne
@@ -45,12 +52,33 @@ cycle_var = tk.DoubleVar(value="0.0")
 temperature_thermocouple_var = tk.DoubleVar(value="0.0")
 bottom_cover_temperature = tk.DoubleVar(value="0.0")
 humidity = tk.DoubleVar(value="0.0")
-currentTime = tk.StringVar(value="00:00:00")
+elapsed_time_var = tk.StringVar(value="00:00:00")
+remaining_time_var = tk.StringVar(value="00:00:00")
 temperature_ir_var = tk.DoubleVar(value="0.0")
 temperature_expected_var = tk.DoubleVar(value="0.0")
 temperature_approximate_var = tk.DoubleVar(value="0.0")
+
 elapsed_time = 0
-add_time = time_to_seconds("03:46") # Dodatkowy czas w minutach
+add_time = time_to_seconds("06:30") # Dodatkowy czas w minutach
+
+bisquit_curve = {
+        0: 30,
+        3: 200,
+        4: 400,
+        5: 500,
+        6: 600,
+        7: 800,
+        8: 950,
+        9: 1050
+    }
+
+glazing_curve = {
+        0: 30,
+        2: 200,
+        3: 850,
+        4: 950,
+        5: 1050
+    }
 
 temp_calc = TemperatureApproximator()
 
@@ -76,7 +104,7 @@ def triac_pin_set_zero():
     lgpio.gpio_write(h, TRIAC_PIN, 0)  
 
 def regulation_desk():        
-    root.geometry("640x700")
+    root.geometry("640x780")
     root.title("Sterowanie Piecykiem")
 
 def clear_inputs():
@@ -120,20 +148,22 @@ def update_temp_and_humidity(i2c):
 def update_time():
     hours, remainder = divmod(int(elapsed_time), 3600)
     minutes, seconds = divmod(remainder, 60)
-    currentTime.set(f"{hours:02}:{minutes:02}:{seconds:02}")
+    elapsed_time_var.set(f"{hours:02}:{minutes:02}:{seconds:02}")
+    
+    remaining_time = max(temperature_schedule.keys()) * 3600 - elapsed_time
+    hours, remainder = divmod(int(remaining_time), 3600)
+    minutes, seconds = divmod(remainder, 60)
+    remaining_time_var.set(f"{hours:02}:{minutes:02}:{seconds:02}") 
+    
 
+def update_PID():
+    global elapsed_time, on_delay, impulse_after_var
+    pid = PIDController(setpoint=800, Kp=2.0, Ki=0.1, Kd=0.05)
+    on_delay = int(pid.compute_power(temperature_approximate_var.get())) #czas w ms do sterowania triakiem
+    impulse_after_var.set(on_delay)
 
 def get_expected_temperature() -> float:
-    temperature_schedule = {
-        0: 30,
-        3: 200,
-        4: 400,
-        5: 500,
-        6: 600,
-        7: 800,
-        8: 950,
-        9: 1050
-    }
+    global temperature_schedule
     
     # Konwersja godzin na sekundy
     schedule_seconds = {k * 3600: v for k, v in temperature_schedule.items()}
@@ -162,7 +192,7 @@ def get_expected_temperature() -> float:
 def write_data(file_handle):
     global spinbox_impulse_prev, spinbox_impulse_after
 
-    data = [{"currentTime": str(currentTime.get()), 
+    data = [{"elapsed_time_var": str(elapsed_time_var.get()), 
             "Triac off": str(spinbox_impulse_prev.get()),
             "Triac on": str(spinbox_impulse_after.get()),
             "temperature thermocouple": str(temperature_thermocouple_var.get()),
@@ -180,7 +210,7 @@ def write_data(file_handle):
             }]
 
     fieldnames = [
-        "currentTime", 
+        "elapsed_time_var", 
         "Triac off", 
         "Triac on", 
         "temperature thermocouple",
@@ -212,62 +242,73 @@ def write_data(file_handle):
 frame = tk.Frame(root)
 frame.pack(pady=(10, 10))
 
-tk.Label(frame, text="Time:", anchor="center").grid(row=0, column=0, padx=(10, 10),  pady=(10, 10))
-tk.Label(frame, textvariable=currentTime, anchor="center").grid(row=0, column=1, padx=(10, 10),  pady=(10, 10))
+# Dodanie pola wyboru dla krzywej wypału
+curve_var = tk.StringVar(value="bisquit_curve")
 
-tk.Label(frame, text="Frequency (Hz):", anchor="center").grid(row=1, column=0, padx=(10, 10),  pady=(10, 10))
-tk.Label(frame, textvariable=freq_var, anchor="center").grid(row=1, column=1, padx=(10, 10),  pady=(10, 10))
+temperature_schedule = bisquit_curve #defaultowo wybrana krzywa bisquit_curve
 
-tk.Label(frame, text="Cycle (ms):", anchor="center").grid(row=2, column=0, padx=(10, 10))
-tk.Label(frame, textvariable=cycle_var, anchor="center").grid(row=2, column=1, padx=(10, 10))
+def set_temperature_schedule(selected_curve):
+    global temperature_schedule
+    selected_curve = curve_var.get()
+    if selected_curve == "bisquit_curve":
+        temperature_schedule = bisquit_curve
+    elif selected_curve == "glazing_curve":
+        temperature_schedule = glazing_curve
 
-tk.Label(frame, text="TRIAC OFF (ms):", anchor="center").grid(row=3, column=0, padx=(10, 10), pady=(10, 10))
-impulse_prev_var = tk.DoubleVar(value=0)
-spinbox_impulse_prev = tk.Spinbox(frame, from_=0, to=5000, increment=1, textvariable=impulse_prev_var, width=5)
-spinbox_impulse_prev.grid(row=3, column=1, padx=(10, 10), pady=(10, 10))
+curve_var = tk.StringVar(value="bisquit_curve")
+curve_option_menu = tk.OptionMenu(frame, curve_var, "bisquit_curve", "glazing_curve", command=set_temperature_schedule)
+curve_option_menu.config(width=15)
+curve_option_menu.grid(row=0, column=0, columnspan=3, padx=(10, 10), pady=(10, 10))
 
-tk.Label(frame, text="TRIAC ON (ms):", anchor="center").grid(row=4, column=0, padx=(10, 10), pady=(10, 10))
-impulse_after_var = tk.DoubleVar(value=0)
-spinbox_impulse_after = tk.Spinbox(frame, from_=0, to=5000, increment=1, textvariable=impulse_after_var, width=5)
-spinbox_impulse_after.grid(row=4, column=1, padx=(10, 10), pady=(10, 10))
+tk.Label(frame, text="Elapsed Time:", anchor="center").grid(row=1, column=0, padx=(10, 10),  pady=(10, 10))
+tk.Label(frame, textvariable=elapsed_time_var, anchor="center").grid(row=1, column=1, padx=(10, 10),  pady=(10, 10))
 
-tk.Button(frame, text="CLEAR", command=clear_inputs, anchor="center").grid(row=4, column=2, padx=(10, 10), pady=(10, 10))
-tk.Button(frame, text="SET", command=set_inputs, anchor="center").grid(row=4, column=3, padx=(10, 10), pady=(10, 10))
+tk.Label(frame, text="Remaining Time:", anchor="center").grid(row=2, column=0, padx=(10, 10),  pady=(10, 10))
+tk.Label(frame, textvariable=remaining_time_var, anchor="center").grid(row=2, column=1, padx=(10, 10),  pady=(10, 10))
 
-tk.Label(frame, text="Voltage (V):", anchor="center").grid(row=5, column=0, padx=(10, 10), pady=(10, 10))
-tk.Label(frame, textvariable=voltage_var, anchor="center").grid(row=5, column=1, padx=(10, 10), pady=(10, 10))
+tk.Label(frame, text="Frequency (Hz):", anchor="center").grid(row=3, column=0, padx=(10, 10),  pady=(10, 10))
+tk.Label(frame, textvariable=freq_var, anchor="center").grid(row=3, column=1, padx=(10, 10),  pady=(10, 10))
+
+tk.Label(frame, text="Cycle (ms):", anchor="center").grid(row=4, column=0, padx=(10, 10))
+tk.Label(frame, textvariable=cycle_var, anchor="center").grid(row=4, column=1, padx=(10, 10))
+
+tk.Label(frame, text="Triac on (ms):", anchor="center").grid(row=5, column=0, padx=(10, 10), pady=(10, 10))
+tk.Label(frame, textvariable=impulse_after_var, anchor="center").grid(row=5, column=1, padx=(10, 10))
+
+tk.Label(frame, text="Voltage (V):", anchor="center").grid(row=6, column=0, padx=(10, 10), pady=(10, 10))
+tk.Label(frame, textvariable=voltage_var, anchor="center").grid(row=6, column=1, padx=(10, 10), pady=(10, 10))
     
-tk.Label(frame, text="Current (A):", anchor="center").grid(row=6, column=0, padx=(10, 10), pady=(10, 10))
-tk.Label(frame, textvariable=current_var, anchor="center").grid(row=6, column=1, padx=(10, 10), pady=(10, 10))
+tk.Label(frame, text="Current (A):", anchor="center").grid(row=7, column=0, padx=(10, 10), pady=(10, 10))
+tk.Label(frame, textvariable=current_var, anchor="center").grid(row=7, column=1, padx=(10, 10), pady=(10, 10))
 
-tk.Label(frame, text="Power (W):", anchor="center").grid(row=6, column=0, padx=(10, 10), pady=(10, 10))
-tk.Label(frame, textvariable=power_var, anchor="center").grid(row=6, column=1, padx=(10, 10), pady=(10, 10))
+tk.Label(frame, text="Power (W):", anchor="center").grid(row=8, column=0, padx=(10, 10), pady=(10, 10))
+tk.Label(frame, textvariable=power_var, anchor="center").grid(row=8, column=1, padx=(10, 10), pady=(10, 10))
 
-tk.Label(frame, text="Energy (Wh):", anchor="center").grid(row=8, column=0, padx=(10, 10), pady=(10, 10))
-tk.Label(frame, textvariable=energy_var, anchor="center").grid(row=8, column=1, padx=(10, 10), pady=(10, 10))
+tk.Label(frame, text="Energy (Wh):", anchor="center").grid(row=9, column=0, padx=(10, 10), pady=(10, 10))
+tk.Label(frame, textvariable=energy_var, anchor="center").grid(row=9, column=1, padx=(10, 10), pady=(10, 10))
 
-tk.Label(frame, text="Thermocouple temperature (°C):", anchor="center").grid(row=9, column=0, padx=(10, 10), pady=(10, 10))
-tk.Label(frame, textvariable=temperature_thermocouple_var, anchor="center").grid(row=9, column=1, padx=(10, 10), pady=(10, 10))   
+tk.Label(frame, text="Thermocouple temperature (°C):", anchor="center").grid(row=10, column=0, padx=(10, 10), pady=(10, 10))
+tk.Label(frame, textvariable=temperature_thermocouple_var, anchor="center").grid(row=10, column=1, padx=(10, 10), pady=(10, 10))   
 
-tk.Label(frame, text="Temperature IR (°C):", anchor="center").grid(row=10, column=0, padx=(10, 10), pady=(10, 10))
+tk.Label(frame, text="Temperature IR (°C):", anchor="center").grid(row=11, column=0, padx=(10, 10), pady=(10, 10))
 temperature_ir_var = tk.DoubleVar(value=0)
 spinbox_temperature_ir_var = tk.Spinbox(frame, from_=-1000, to=1000, increment=1, textvariable=temperature_ir_var, width=5)
-spinbox_temperature_ir_var.grid(row=10, column=1, padx=(10, 10), pady=(10, 10)) 
-tk.Button(frame, text="SET", command=set_temperature_ir, anchor="center").grid(row=10, column=2, padx=(10, 10), pady=(10, 10))
+spinbox_temperature_ir_var.grid(row=11, column=1, padx=(10, 10), pady=(10, 10)) 
+tk.Button(frame, text="SET", command=set_temperature_ir, anchor="center").grid(row=11, column=2, padx=(10, 10), pady=(10, 10))
 
-tk.Label(frame, text="Temperature approximate (°C):", anchor="center").grid(row=11, column=0, padx=(10, 10), pady=(10, 10))
-tk.Label(frame, textvariable=temperature_approximate_var, anchor="center").grid(row=11, column=1, padx=(10, 10), pady=(10, 10))    
+tk.Label(frame, text="Temperature approximate (°C):", anchor="center").grid(row=12, column=0, padx=(10, 10), pady=(10, 10))
+tk.Label(frame, textvariable=temperature_approximate_var, anchor="center").grid(row=12, column=1, padx=(10, 10), pady=(10, 10))    
 
-tk.Label(frame, text="Temperature expected (°C):", anchor="center").grid(row=12, column=0, padx=(10, 10), pady=(10, 10))
-tk.Label(frame, textvariable=temperature_expected_var, anchor="center").grid(row=12, column=1, padx=(10, 10), pady=(10, 10))    
+tk.Label(frame, text="Temperature expected (°C):", anchor="center").grid(row=13, column=0, padx=(10, 10), pady=(10, 10))
+tk.Label(frame, textvariable=temperature_expected_var, anchor="center").grid(row=13, column=1, padx=(10, 10), pady=(10, 10))    
 
-tk.Label(frame, text="Bottom Cover Temperature (°C):", anchor="center").grid(row=13, column=0, padx=(10, 10), pady=(10, 10))
-tk.Label(frame, textvariable=bottom_cover_temperature, anchor="center").grid(row=13, column=1, padx=(10, 10), pady=(10, 10))    
+tk.Label(frame, text="Bottom Cover Temperature (°C):", anchor="center").grid(row=14, column=0, padx=(10, 10), pady=(10, 10))
+tk.Label(frame, textvariable=bottom_cover_temperature, anchor="center").grid(row=14, column=1, padx=(10, 10), pady=(10, 10))    
 
-tk.Label(frame, text="Humidity (%):", anchor="center").grid(row=14, column=0, padx=(10, 10), pady=(10, 10))
-tk.Label(frame, textvariable=humidity, anchor="center").grid(row=14, column=1, padx=(10, 10), pady=(10, 10))        
+tk.Label(frame, text="Humidity (%):", anchor="center").grid(row=15, column=0, padx=(10, 10), pady=(10, 10))
+tk.Label(frame, textvariable=humidity, anchor="center").grid(row=15, column=1, padx=(10, 10), pady=(10, 10))        
 
-tk.Button(frame, text="FINISH", command=stop_program, anchor="center").grid(row=15, column=0, columnspan=4, padx=(10, 10), pady=(10, 10))
+tk.Button(frame, text="FINISH", command=stop_program, anchor="center").grid(row=16, column=0, columnspan=4, padx=(10, 10), pady=(10, 10))
 
 
 #############################
@@ -303,7 +344,7 @@ try:
         if lgpio.gpio_read(h, ZERO_CROSS_PIN) == 0 and permision == 1:
             # Włączenie optotriaka
             lgpio.gpio_write(h, TRIAC_PIN, 1)
-            time.sleep(on_delay/1000)
+            time.sleep(on_delay/1000)            
 
             # Wyłączenie optotriaka
             lgpio.gpio_write(h, TRIAC_PIN, 0)    
@@ -314,8 +355,8 @@ try:
             permision = 1
 
         # Aktualizacja wskazań miernika PZEM-004T co 1 sekundę
-        if time.time() - current_time >= 1:
-            elapsed_time = time.time() - start_time + add_time
+        if time.time() - current_time >= 1:            
+            elapsed_time = time.time() - start_time + add_time            
             update_temperature(thermocouple)
             update_pzem_data(pzem)
             update_temp_and_humidity(i2c)
@@ -323,6 +364,7 @@ try:
             write_data(file)
             current_time = time.time()
             temperature_expected_var.set(f"{get_expected_temperature():.2f}")
+            update_PID()
 
         root.update_idletasks()
         root.update()          
@@ -332,4 +374,3 @@ except KeyboardInterrupt:
     print("Zatrzymano program przerwaniem.")
 finally:
     file.close()
-

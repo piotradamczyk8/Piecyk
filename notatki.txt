@@ -8,3 +8,6 @@ pinctrl funcs 14 - wyświetli możliwe funkcje dla pinu
 dmesg -T | grep tty  - komunikaty o stanie urządzeń usb
 stty -F /dev/ttyAMA0 - info o porcie
 i2cdetect -y 1 - skanowanie magistrali SDI
+
+source my_env/bin/activate
+pip install simple-pid
