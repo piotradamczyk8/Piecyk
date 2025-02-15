@@ -19,8 +19,7 @@ class Thermocouple:
         
         # Sprawdzenie błędów
         if raw_value & 0x07:  # Jeśli są ustawione bity błędu, ignorujemy odczyt
-            print("Błąd odczytu termopary! Zwracam ostatnią poprawną temperaturę.")
-            return 0
+            print("Błąd odczytu termopary!")
 
         # Wydobycie temperatury w °C
         temp_raw = (raw_value >> 18) & 0x3FFF  # 14-bitowa temperatura
