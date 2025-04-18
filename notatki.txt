@@ -11,3 +11,5 @@ i2cdetect -y 1 - skanowanie magistrali SDI
 
 source my_env/bin/activate
 pip install simple-pid
+
+pip3 install pymodbus==3.8.3 spidev==3.6 lgpio adafruit-blinka adafruit-circuitpython-sht31d numpy==2.2.1 simple-pid  - instalacja wszystkich bibliotek

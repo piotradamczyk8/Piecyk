@@ -2,20 +2,25 @@ import lgpio
 import time
 import tkinter as tk
 from tkinter import ttk
-from PZEM_004T import PZEM_004T
-from Thermocouple import Thermocouple
-from TemperatureApproximator import TemperatureApproximator
 import board
 import busio
 import adafruit_sht31d
 import csv
 import numpy as np
-from PIDController import PIDController
+import matplotlib.pyplot as plt
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
-##############################################
+from PZEM_004T import PZEM_004T
+from Thermocouple import Thermocouple
+from TemperatureApproximator import TemperatureApproximator
+from PIDController import PIDController
+from src.classes.TemperatureCurves import TemperatureCurves
+
+################################################
 # Stałe
 ##############################################
-ZERO_CROSS_PIN = 23  # Pin do wykrywania przejścia przez zero
+ZERO_CROSS_PIN = 23  # Pin do wykrywania przejścia przez zero 
 TRIAC_PIN = 24       # Pin sterujący optotriakiem
 FREQ = 50            # Częstotliwość sieci w Hz (np. 50Hz)
 HALF_CYCLE = (1 / FREQ) / 2  # Połówka okresu
@@ -37,7 +42,10 @@ def seconds_to_time(seconds):
 # Zmienne globalne
 ##############################################
 root = tk.Tk()
-
+curve_var = tk.StringVar(value="Glazing") # Domyślna wartość
+temp_plot = None # Globalna zmienna dla obiektu wykresu
+progress_var = tk.DoubleVar(value=0) # Zmienna dla paska postępu
+progress_bar = None # Globalna zmienna dla paska postępu
 
 permision = 1
 off_delay = 0
@@ -63,44 +71,273 @@ temperature_expected_var = tk.DoubleVar(value="0.0")
 temperature_approximate_var = tk.DoubleVar(value="0.0")
 elapsed_time = 0
 remaining_time = 0
-add_time = time_to_seconds("02:00") # Dodatkowy
+add_time = time_to_seconds("00:00") # Dodatkowy
 progres_var_percent = tk.StringVar(value="0")
 
+# Definicje krzywych temperatury
 Bisquit = {
-        0: 30,
-        3: 200,
-        4: 400,
-        5: 500,
-        6: 600,
-        7: 850,
-        7.25: 850,
-        8: 600,
-        9: 200,
-        10: 30
-    }
+    0: 30,
+    3: 200,
+    4: 400,
+    5: 500,
+    6: 600,
+    7: 850,
+    7.25: 850,
+    8: 600,
+    9: 500,
+    10: 200,
+    11: 30
+}
 
-Glazing_old = {
-        0: 30,
-        2: 200,
-        3: 850,
-        4: 950,
-        5: 1050,
-        5.25: 1050,
-        6: 850,
-        7: 600,
-        8: 200,
-        9: 30
-    }
+Bisquit_express = {
+    0: 30,
+    3: 500,
+    4: 600,
+    5: 850,
+    5.25: 850,
+    6: 600,
+    7: 500,
+    8: 30
+}
 
 Glazing = {
-        0: 30,
-        1: 400,
-        2: 1050,
-        2.25: 1050,
-        2.5: 1050
-    }
- 
+    0: 30,
+    1: 200,
+    2: 500,
+    3: 600,
+    4.00: 1050,
+    4.25: 1050,
+    5: 850,
+    6: 600,
+    7: 500,
+    8: 200,
+    9: 30
+}
+
+Glazing_perfect = {
+    0: 30,
+    1: 200,
+    2: 500,
+    3: 600,
+    4: 750,
+    5: 900,
+    6.00: 1050,
+    6.25: 1050,
+    7: 850,
+    8: 600,
+    9: 500,
+    10: 30,
+}
+
+Glazing_express = {
+    0: 30,
+    2.00: 1000,
+    2.25: 1030,
+    3.00: 30
+}
+
 temp_calc = TemperatureApproximator()
+
+##############################################
+# Klasa do obsługi wykresu
+##############################################
+class TemperaturePlot:
+    def __init__(self, parent_frame):
+        self.fig = Figure(figsize=(6, 3), dpi=100)
+        self.ax = self.fig.add_subplot(111)
+
+        self.ax.set_title("Temperature Profile")
+        self.ax.set_xlabel("Time (HH:MM)")
+        self.ax.set_ylabel("Temperature (°C)")
+
+        # Lines for expected and actual temperature
+        self.line_expected, = self.ax.plot([], [], 'r--', label='Expected')
+        self.line_actual, = self.ax.plot([], [], 'b-', label='Actual')
+        # Line for the entire profile
+        self.line_profile, = self.ax.plot([], [], 'g:', label='Profile')
+        # Vertical line for current point
+        self.line_current = self.ax.axvline(x=0, color='r', linestyle='-', linewidth=2, label='Current point', picker=5)
+
+        # Ustawienie formatera osi X
+        def time_formatter(x, pos):
+            hours = int(x // 3600)
+            minutes = int((x % 3600) // 60)
+            return f"{hours:02}:{minutes:02}"
+        
+        self.ax.xaxis.set_major_formatter(plt.FuncFormatter(time_formatter))
+
+        self.ax.legend()
+        self.ax.grid(True)
+
+        self.canvas = FigureCanvasTkAgg(self.fig, master=parent_frame)
+        self.canvas_widget = self.canvas.get_tk_widget()
+        self.canvas_widget.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
+
+        # Dane do wykresu
+        self.time_data = []
+        self.temp_actual_data = []
+        self.temp_expected_data = []
+        self.profile_times = []
+        self.profile_temps = []
+
+        # Zmienne do przeciągania linii
+        self.dragging = False
+        self.drag_start_x = 0
+        self.drag_current_x = 0
+
+        # Podłącz obsługę zdarzeń myszy
+        self.canvas.mpl_connect('button_press_event', self.on_press)
+        self.canvas.mpl_connect('button_release_event', self.on_release)
+        self.canvas.mpl_connect('motion_notify_event', self.on_motion)
+        self.canvas.mpl_connect('pick_event', self.on_pick)
+        self.canvas.mpl_connect('axes_enter_event', self.on_axes_enter)
+        self.canvas.mpl_connect('axes_leave_event', self.on_axes_leave)
+
+    def on_pick(self, event):
+        if event.artist == self.line_current:
+            self.canvas_widget.config(cursor="sb_h_double_arrow")
+
+    def on_axes_enter(self, event):
+        if event.inaxes == self.ax:
+            self.canvas_widget.config(cursor="arrow")
+
+    def on_axes_leave(self, event):
+        self.canvas_widget.config(cursor="arrow")
+
+    def on_press(self, event):
+        if event.inaxes != self.ax:
+            return
+        if self.line_current.contains(event)[0]:
+            self.dragging = True
+            self.drag_start_x = event.xdata
+            self.drag_current_x = event.xdata
+            self.canvas_widget.config(cursor="sb_h_double_arrow")
+
+    def on_release(self, event):
+        if self.dragging:
+            self.dragging = False
+            self.canvas_widget.config(cursor="arrow")
+            if event.inaxes != self.ax:
+                return
+            if hasattr(event, 'xdata') and event.xdata is not None:
+                self.update_time_from_line(event.xdata)
+
+    def on_motion(self, event):
+        if not self.dragging or event.inaxes != self.ax:
+            return
+        if hasattr(event, 'xdata') and event.xdata is not None:
+            # Ogranicz ruch linii do zakresu wykresu
+            xdata = max(0, min(event.xdata, max(self.profile_times)))
+            self.drag_current_x = xdata
+            # Aktualizuj tylko pozycję linii
+            self.line_current.set_xdata([xdata, xdata])
+            # Odśwież tylko linię
+            self.ax.draw_artist(self.line_current)
+            self.canvas.blit(self.ax.bbox)
+
+    def update_time_from_line(self, xdata):
+        global elapsed_time, start_time, add_time
+        # Ogranicz wartość do zakresu wykresu
+        xdata = max(0, min(xdata, max(self.profile_times)))
+        
+        # Aktualizuj czasy
+        add_time = xdata
+        elapsed_time = xdata
+        start_time = time.time() - xdata
+        
+        # Aktualizuj pole tekstowe
+        hours = int(xdata // 3600)
+        minutes = int((xdata % 3600) // 60)
+        initial_time_var.set(f"{hours:02}:{minutes:02}")
+        
+        # Resetuj dane wykresu
+        self.time_data = []
+        self.temp_actual_data = []
+        self.temp_expected_data = []
+        self.line_actual.set_data([], [])
+        self.line_expected.set_data([], [])
+        
+        # Aktualizuj wykres
+        actual = float(temperature_approximate_var.get())
+        expected = float(temperature_expected_var.get())
+        self.update_plot(xdata, actual, expected)
+        
+        # Aktualizuj etykiety czasu
+        update_time()
+        
+        print(f"Ustawiono czas z linii: {xdata} sekund ({hours:02}:{minutes:02})")
+
+    def update_plot(self, time_point, actual_temp, expected_temp):
+        """Dodaje nowy punkt danych i aktualizuje wykres."""
+        self.time_data.append(time_point)
+        self.temp_actual_data.append(actual_temp)
+        self.temp_expected_data.append(expected_temp)
+
+        # Aktualizacja danych linii
+        self.line_actual.set_data(self.time_data, self.temp_actual_data)
+        self.line_expected.set_data(self.time_data, self.temp_expected_data)
+        
+        # Aktualizacja pionowej linii aktualnego punktu
+        if self.profile_times:
+            # Usuń starą linię pionową
+            self.line_current.remove()
+            # Utwórz nową linię pionową
+            self.line_current = self.ax.axvline(x=time_point, color='r', linestyle='-', linewidth=2, picker=5)
+            #print(f"Updating current line: x={time_point}") # Debug
+
+        # Ustawienie limitów osi Y na podstawie profilu + margines
+        if self.profile_temps:
+            min_temp = min(self.profile_temps)
+            max_temp = max(self.profile_temps)
+            margin = (max_temp - min_temp) * 0.1
+            self.ax.set_ylim(bottom=min_temp - margin, top=max_temp + margin)
+
+        # Ustawienie limitów osi X na podstawie profilu zadanego
+        if self.profile_times:
+            self.ax.set_xlim(left=0, right=max(self.profile_times) * 1.05)
+
+        # Odświeżenie wykresu
+        self.canvas.draw()
+        self.canvas.flush_events()
+        self.fig.canvas.draw_idle()
+        self.canvas_widget.update_idletasks()
+        self.canvas_widget.update()
+
+    def draw_expected_profile(self, schedule):
+        """Rysuje cały oczekiwany profil temperatury na podstawie harmonogramu."""
+        # Konwersja godzin na sekundy
+        schedule_seconds = {k * 3600: v for k, v in schedule.items()}
+        self.profile_times = sorted(schedule_seconds.keys())
+        self.profile_temps = [schedule_seconds[t] for t in self.profile_times]
+
+        # Ustawienie danych dla linii profilu
+        self.line_profile.set_data(self.profile_times, self.profile_temps)
+
+        # Ustawienie limitów osi Y na podstawie profilu + margines
+        min_temp = min(self.profile_temps)
+        max_temp = max(self.profile_temps)
+        margin = (max_temp - min_temp) * 0.1
+        self.ax.set_ylim(bottom=min_temp - margin, top=max_temp + margin)
+
+        # Ustawienie limitu osi X na podstawie maksymalnego czasu profilu
+        if self.profile_times:
+            self.ax.set_xlim(left=0, right=max(self.profile_times) * 1.05)
+
+        # Wyczyść dane bieżące przy zmianie profilu
+        self.time_data = []
+        self.temp_actual_data = []
+        self.temp_expected_data = []
+        self.line_actual.set_data([], [])
+        self.line_expected.set_data([], [])
+        if hasattr(self, 'line_current'):
+            self.line_current.remove()
+            self.line_current = self.ax.axvline(x=0, color='r', linestyle='-', linewidth=2, picker=5)
+
+        self.ax.legend()
+        self.canvas.draw()
+        self.canvas.flush_events()
+        self.canvas_widget.update_idletasks()
+        self.canvas_widget.update()
 
 ##############################################
 # Funkcje pomocnicze
@@ -114,10 +351,13 @@ def setup_gpio():
     lgpio.gpio_write(h, TRIAC_PIN, 0)
 
 def stop_program():
-    triac_pin_set_zero()
-    lgpio.gpiochip_close(h)
+    try:
+        triac_pin_set_zero()
+        lgpio.gpiochip_close(h)
+    except Exception as e:
+        print(f"Błąd przy zamykaniu GPIO: {e}")
     print("Zatrzymano program przyciskiem")
-    exit(0)
+    root.quit()  # Zamiast exit(0) używamy root.quit()
 
 def triac_pin_set_zero():
     lgpio.gpio_claim_output(h, TRIAC_PIN)
@@ -125,7 +365,7 @@ def triac_pin_set_zero():
 
 def regulation_desk():        
     root.geometry("640x820")
-    root.title("Sterowanie Piecykiem")
+    root.title("Kiln Control System")
 
 def clear_inputs():
     global off_delay, on_delay
@@ -171,19 +411,29 @@ def update_time():
     minutes, seconds = divmod(remainder, 60)
     elapsed_time_var.set(f"{hours:02}:{minutes:02}:{seconds:02}")
     
-    remaining_time = max(temperature_schedule.keys()) * 3600 - elapsed_time
+    print(f"Elapsed time: {hours:02}:{minutes:02}:{seconds:02}")
+
+    # Oblicz pozostały czas na podstawie harmonogramu
+    total_schedule_time = max(temperature_schedule.keys()) * 3600
+    remaining_time = max(0, total_schedule_time - elapsed_time)
+    
     hours, remainder = divmod(int(remaining_time), 3600)
     minutes, seconds = divmod(remainder, 60)
     remaining_time_var.set(f"{hours:02}:{minutes:02}:{seconds:02}") 
 
-    total_time = elapsed_time + remaining_time
-    if total_time > 0:
-        progress = (elapsed_time / total_time) * 100
-        progress_var.set(progress)
+    # Oblicz postęp
+    if total_schedule_time > 0:
+        progress = (elapsed_time / total_schedule_time) * 100
+        progress_var.set(progress)  # Aktualizuj wartość paska postępu
+        if progress_bar:  # Sprawdź czy progress_bar istnieje
+            progress_bar.update()  # Wymuś odświeżenie paska postępu
     else:
         progress_var.set(0)
+        if progress_bar:
+            progress_bar.update()
 
-    final_time = time.strftime("%H:%M:%S", time.localtime())
+    # Oblicz przewidywany czas zakończenia
+    final_time = time.strftime("%H:%M:%S", time.localtime(time.time() + remaining_time + add_time))
     final_time_var.set(final_time)
 
     progres_var_percent.set(f"{progress:.2f}%")
@@ -192,7 +442,7 @@ def update_time():
 def update_PID():
     global elapsed_time, on_delay, impulse_after_var
     setpoint = get_expected_temperature()
-    pid = PIDController(setpoint, Kp=320.0, Ki=160.0, Kd=8)
+    pid = PIDController(setpoint, Kp=160, Ki=80, Kd=4)
     on_delay = int(pid.compute_power(temperature_approximate_var.get())) #czas w ms do sterowania triakiem
     impulse_after_var.set(on_delay)
 
@@ -272,91 +522,190 @@ def write_data(file_handle):
 ############################################
     # GUI
 ############################################
+def setup_gui():
+    global frame, temp_plot, initial_time_var, progress_bar
 
-frame = tk.Frame(root)
-frame.pack(pady=(10, 10))
+    # Frame for controls (upper part)
+    controls_frame = tk.Frame(root)
+    controls_frame.pack(pady=(10, 0), fill=tk.X)
 
-# Dodanie pola wyboru dla krzywej wypału
-curve_var = tk.StringVar(value="Glazing")
+    # === GUI elements moved to controls_frame ===
+    curve_option_menu = tk.OptionMenu(controls_frame, curve_var, "Bisquit", "Bisquit_express", "Glazing", "Glazing_perfect", "Glazing_express", command=lambda sel=curve_var: set_temperature_schedule(curve_var))
+    curve_option_menu.config(width=15)
+    curve_option_menu.pack(pady=(10, 10))
 
-temperature_schedule = Glazing #defaultowo wybrana krzywa Glazing
+    # Frame for initial time
+    initial_time_frame = tk.Frame(controls_frame)
+    initial_time_frame.pack(pady=5)
+    tk.Label(initial_time_frame, text="Initial time (HH:MM):").pack(side=tk.LEFT, padx=5)
+    initial_time_var = tk.StringVar(value="01:00")
+    initial_time_entry = tk.Entry(initial_time_frame, textvariable=initial_time_var, width=5)
+    initial_time_entry.pack(side=tk.LEFT, padx=5)
+    tk.Button(initial_time_frame, text="SET", command=set_initial_time).pack(side=tk.LEFT, padx=5)
 
-def set_temperature_schedule(selected_curve):
-    global temperature_schedule
-    selected_curve = curve_var.get()
-    if selected_curve == "Bisquit":
-        temperature_schedule = Bisquit
+    # Progress bar
+    progress_bar = ttk.Progressbar(controls_frame, variable=progress_var, maximum=100, length=500, style="blue.Horizontal.TProgressbar")
+    progress_bar.pack(pady=(0, 5))
     
-    elif selected_curve == "Glazing":
-        temperature_schedule = Glazing
+    style = ttk.Style()
+    style.configure("blue.Horizontal.TProgressbar", troughcolor='white', background='navy', thickness=25)
+    progress_label = tk.Label(controls_frame, textvariable=progres_var_percent, anchor="center", fg="white", bg="navy")
+    progress_label.place(in_=progress_bar, relx=0.5, rely=0.5, anchor="center")
 
-curve_var = tk.StringVar(value="Glazing")
-curve_option_menu = tk.OptionMenu(frame, curve_var, "Bisquit", "Glazing", command=set_temperature_schedule)
-curve_option_menu.config(width=15)
-curve_option_menu.grid(row=0, column=0, columnspan=3, padx=(10, 10), pady=(10, 10))
+    # Frame for labels and values
+    info_frame = tk.Frame(controls_frame)
+    info_frame.pack(pady=5)
 
-progress_var = tk.DoubleVar(value=0)
-progress_bar = ttk.Progressbar(frame, variable=progress_var, maximum=100)
-progress_bar.config(length=500, style="blue.Horizontal.TProgressbar")
-progress_bar.grid(row=1, column=0, columnspan=3, padx=(10, 10), pady=(10, 10))
+    # Labels and values in grid
+    tk.Label(info_frame, text="Elapsed Time:").grid(row=0, column=0, padx=5, sticky="w")
+    tk.Label(info_frame, textvariable=elapsed_time_var).grid(row=0, column=1, padx=5, sticky="w")
+    tk.Label(info_frame, text="Remaining Time:").grid(row=1, column=0, padx=5, sticky="w")
+    tk.Label(info_frame, textvariable=remaining_time_var).grid(row=1, column=1, padx=5, sticky="w")
+    tk.Label(info_frame, text="Final time:").grid(row=2, column=0, padx=5, sticky="w")
+    tk.Label(info_frame, textvariable=final_time_var).grid(row=2, column=1, padx=5, sticky="w")
 
-# Configure the style for the progress bar
-style = ttk.Style()
-style.configure("blue.Horizontal.TProgressbar", troughcolor='white', background='navy', thickness=25)
+    tk.Label(info_frame, text="Cycle (ms):").grid(row=0, column=2, padx=5, sticky="w")
+    tk.Label(info_frame, textvariable=cycle_var).grid(row=0, column=3, padx=5, sticky="w")
+    tk.Label(info_frame, text="Triac on (ms):", fg="maroon").grid(row=1, column=2, padx=5, sticky="w")
+    tk.Label(info_frame, textvariable=impulse_after_var, fg="maroon").grid(row=1, column=3, padx=5, sticky="w")
 
-progress_label = tk.Label(frame, textvariable=progres_var_percent, anchor="center", fg="white", bg="navy")
-progress_label.place(in_=progress_bar, relx=0.5, rely=0.5, anchor="center")
+    tk.Label(info_frame, text="Voltage (V):").grid(row=3, column=0, padx=5, sticky="w")
+    tk.Label(info_frame, textvariable=voltage_var).grid(row=3, column=1, padx=5, sticky="w")
+    tk.Label(info_frame, text="Current (A):").grid(row=4, column=0, padx=5, sticky="w")
+    tk.Label(info_frame, textvariable=current_var).grid(row=4, column=1, padx=5, sticky="w")
+    tk.Label(info_frame, text="Power (W):", fg="maroon").grid(row=5, column=0, padx=5, sticky="w")
+    tk.Label(info_frame, textvariable=power_var, fg="maroon").grid(row=5, column=1, padx=5, sticky="w")
+    tk.Label(info_frame, text="Energy (Wh):").grid(row=6, column=0, padx=5, sticky="w")
+    tk.Label(info_frame, textvariable=energy_var).grid(row=6, column=1, padx=5, sticky="w")
 
-tk.Label(frame, text="Elapsed Time:", anchor="center").grid(row=2, column=0, padx=(10, 10),  pady=(10, 10))
-tk.Label(frame, textvariable=elapsed_time_var, anchor="center").grid(row=2, column=1, padx=(10, 10),  pady=(10, 10))
+    tk.Label(info_frame, text="Thermocouple (°C):").grid(row=3, column=2, padx=5, sticky="w")
+    tk.Label(info_frame, textvariable=temperature_thermocouple_var).grid(row=3, column=3, padx=5, sticky="w")
+    tk.Label(info_frame, text="Temp. Approx (°C):", fg="maroon").grid(row=4, column=2, padx=5, sticky="w")
+    tk.Label(info_frame, textvariable=temperature_approximate_var, fg="maroon").grid(row=4, column=3, padx=5, sticky="w")
+    tk.Label(info_frame, text="Temp. Expected (°C):", fg="maroon").grid(row=5, column=2, padx=5, sticky="w")
+    tk.Label(info_frame, textvariable=temperature_expected_var, fg="maroon").grid(row=5, column=3, padx=5, sticky="w")
 
-tk.Label(frame, text="Remaining Time:", anchor="center").grid(row=3, column=0, padx=(10, 10),  pady=(10, 10))
-tk.Label(frame, textvariable=remaining_time_var, anchor="center").grid(row=3, column=1, padx=(10, 10),  pady=(10, 10))
+    # Frame for IR correction
+    ir_frame = tk.Frame(controls_frame)
+    ir_frame.pack(pady=5)
+    tk.Label(ir_frame, text="Corrective temperature IR (°C):").pack(side=tk.LEFT, padx=5)
+    spinbox_temperature_ir_var = tk.Spinbox(ir_frame, from_=-1000, to=1000, increment=1, textvariable=temperature_ir_var, width=5)
+    spinbox_temperature_ir_var.pack(side=tk.LEFT, padx=5)
+    tk.Button(ir_frame, text="SET", command=set_temperature_ir).pack(side=tk.LEFT, padx=5)
 
-tk.Label(frame, text="Final time:", anchor="center").grid(row=4, column=0, padx=(10, 10),  pady=(10, 10))
-tk.Label(frame, textvariable=final_time_var, anchor="center").grid(row=4, column=1, padx=(10, 10),  pady=(10, 10))
+    # FINISH button at the bottom of controls frame
+    tk.Button(controls_frame, text="FINISH", command=stop_program).pack(pady=(10, 10))
 
-tk.Label(frame, text="Cycle (ms):", anchor="center").grid(row=5, column=0, padx=(10, 10))
-tk.Label(frame, textvariable=cycle_var, anchor="center").grid(row=5, column=1, padx=(10, 10))
+    # === Plot frame (lower part) ===
+    plot_frame = tk.Frame(root)
+    plot_frame.pack(pady=(0, 10), padx=10, fill=tk.BOTH, expand=True)
+    temp_plot = TemperaturePlot(plot_frame)
 
-tk.Label(frame, text="Triac on (ms):", anchor="center", fg="maroon").grid(row=6, column=0, padx=(10, 10), pady=(10, 10))
-tk.Label(frame, textvariable=impulse_after_var, anchor="center", fg="maroon").grid(row=6, column=1, padx=(10, 10))
+    # Set initial schedule on the plot
+    set_temperature_schedule(curve_var)
 
-tk.Label(frame, text="Voltage (V):", anchor="center").grid(row=7, column=0, padx=(10, 10), pady=(10, 10))
-tk.Label(frame, textvariable=voltage_var, anchor="center").grid(row=7, column=1, padx=(10, 10), pady=(10, 10))
-    
-tk.Label(frame, text="Current (A):", anchor="center").grid(row=8, column=0, padx=(10, 10), pady=(10, 10))
-tk.Label(frame, textvariable=current_var, anchor="center").grid(row=8, column=1, padx=(10, 10), pady=(10, 10))
+# Usunięcie starego tworzenia ramki
+# frame = tk.Frame(root)
+# frame.pack(pady=(10, 10))
 
-tk.Label(frame, text="Power (W):", anchor="center", fg="maroon").grid(row=9, column=0, padx=(10, 10), pady=(10, 10))
-tk.Label(frame, textvariable=power_var, anchor="center", fg="maroon").grid(row=9, column=1, padx=(10, 10), pady=(10, 10))
 
-tk.Label(frame, text="Energy (Wh):", anchor="center").grid(row=10, column=0, padx=(10, 10), pady=(10, 10))
-tk.Label(frame, textvariable=energy_var, anchor="center").grid(row=10, column=1, padx=(10, 10), pady=(10, 10))
+def set_temperature_schedule(curve_tk_var):
+    """Ustawia harmonogram temperatury na podstawie wybranej krzywej."""
+    global temperature_schedule, temp_plot, elapsed_time, start_time
+    selected_curve_name = curve_tk_var.get()
 
-tk.Label(frame, text="Thermocouple temperature (°C):", anchor="center").grid(row=11, column=0, padx=(10, 10), pady=(10, 10))
-tk.Label(frame, textvariable=temperature_thermocouple_var, anchor="center").grid(row=11, column=1, padx=(10, 10), pady=(10, 10))   
+    # Mapowanie nazw z OptionMenu na słowniki z danymi
+    schedule_map = {
+        "Glazing": Glazing,
+        "Bisquit": Bisquit,
+        "Bisquit_express": Bisquit_express,     
+        "Glazing_perfect": Glazing_perfect,
+        "Glazing_express": Glazing_express
+    }
 
-tk.Label(frame, text="Temperature IR (°C):", anchor="center").grid(row=12, column=0, padx=(10, 10), pady=(10, 10))
-temperature_ir_var = tk.DoubleVar(value=0)
-spinbox_temperature_ir_var = tk.Spinbox(frame, from_=-1000, to=1000, increment=1, textvariable=temperature_ir_var, width=5)
-spinbox_temperature_ir_var.grid(row=12, column=1, padx=(10, 10), pady=(10, 10)) 
-tk.Button(frame, text="SET", command=set_temperature_ir, anchor="center").grid(row=12, column=2, padx=(10, 10), pady=(10, 10))
+    if selected_curve_name in schedule_map:
+        temperature_schedule = schedule_map[selected_curve_name]
+        print(f"Wybrano krzywą: {selected_curve_name}")
+        if temp_plot:
+            # Resetuj czas przy zmianie harmonogramu
+            elapsed_time = add_time
+            start_time = time.time() - add_time
+            
+            # Wyczyść dane wykresu
+            temp_plot.time_data = []
+            temp_plot.temp_actual_data = []
+            temp_plot.temp_expected_data = []
+            temp_plot.line_actual.set_data([], [])
+            temp_plot.line_expected.set_data([], [])
+            temp_plot.line_current.set_data([], [])
+            
+            # Narysuj nowy profil
+            temp_plot.draw_expected_profile(temperature_schedule)
+            
+            # Odśwież wykres
+            temp_plot.canvas.draw()
+            temp_plot.canvas.flush_events()
+            
+            # Aktualizuj wykres z początkowymi wartościami
+            actual = float(temperature_approximate_var.get())
+            expected = float(temperature_expected_var.get())
+            temp_plot.update_plot(elapsed_time, actual, expected)
+            
+            # Wyświetl informacje debugowe
+            #print(f"Profile times: {temp_plot.profile_times}")
+            #print(f"Profile temps: {temp_plot.profile_temps}")
+            #print(f"Start time: {start_time}")
+            #print(f"Add time: {add_time}")
+            #print(f"Elapsed time: {elapsed_time}")
+    else:
+        print(f"Nieznana krzywa: {selected_curve_name}")
 
-tk.Label(frame, text="Temperature approximate (°C):", anchor="center" , fg="maroon").grid(row=13, column=0, padx=(10, 10), pady=(10, 10))
-tk.Label(frame, textvariable=temperature_approximate_var, anchor="center", fg="maroon").grid(row=13, column=1, padx=(10, 10), pady=(10, 10))    
-
-tk.Label(frame, text="Temperature expected (°C):", anchor="center", fg="maroon").grid(row=14, column=0, padx=(10, 10), pady=(10, 10))
-tk.Label(frame, textvariable=temperature_expected_var, anchor="center", fg="maroon").grid(row=14, column=1, padx=(10, 10), pady=(10, 10))    
-
-tk.Label(frame, text="Bottom Cover Temperature (°C):", anchor="center").grid(row=15, column=0, padx=(10, 10), pady=(10, 10))
-tk.Label(frame, textvariable=bottom_cover_temperature, anchor="center").grid(row=15, column=1, padx=(10, 10), pady=(10, 10))    
-
-tk.Label(frame, text="Humidity (%):", anchor="center").grid(row=16, column=0, padx=(10, 10), pady=(10, 10))
-tk.Label(frame, textvariable=humidity, anchor="center").grid(row=16, column=1, padx=(10, 10), pady=(10, 10))        
-
-tk.Button(frame, text="FINISH", command=stop_program, anchor="center").grid(row=17, column=0, columnspan=4, padx=(10, 10), pady=(10, 10))
-
+def set_initial_time():
+    global add_time, elapsed_time, start_time
+    try:
+        # Pobierz wartość z pola tekstowego i przekonwertuj na sekundy
+        time_str = initial_time_var.get()
+        add_time = time_to_seconds(time_str)
+        print(f"Ustawiono początkowy czas: {time_str} ({add_time} sekund)")
+        
+        # Aktualizuj start_time i elapsed_time
+        start_time = time.time() - add_time
+        elapsed_time = add_time
+        
+        # Aktualizuj wykres
+        if temp_plot:
+            # Wyczyść dane wykresu
+            temp_plot.time_data = []
+            temp_plot.temp_actual_data = []
+            temp_plot.temp_expected_data = []
+            temp_plot.line_actual.set_data([], [])
+            temp_plot.line_expected.set_data([], [])
+            
+            # Narysuj nowy profil
+            temp_plot.draw_expected_profile(temperature_schedule)
+            
+            # Aktualizuj wykres z początkowymi wartościami
+            actual = float(temperature_approximate_var.get())
+            expected = float(temperature_expected_var.get())
+            temp_plot.update_plot(elapsed_time, actual, expected)
+            
+            # Wyświetl informacje debugowe
+            #print(f"Profile times: {temp_plot.profile_times}")
+            #print(f"Profile temps: {temp_plot.profile_temps}")
+            #print(f"Start time: {start_time}")
+            #print(f"Add time: {add_time}")
+            #print(f"Elapsed time: {elapsed_time}")
+            
+            # Odśwież wykres
+            temp_plot.canvas.draw()
+            temp_plot.canvas.flush_events()
+            temp_plot.canvas_widget.update_idletasks()
+            temp_plot.canvas_widget.update()
+            
+            # Aktualizuj etykiety czasu
+            update_time()
+    except Exception as e:
+        print(f"Błąd przy ustawianiu początkowego czasu: {e}")
 
 #############################
 # PROGRAM GŁÓWNY
@@ -374,52 +723,85 @@ i2c = busio.I2C(board.SCL, board.SDA)
 # Inicjalizacja termopary
 thermocouple = Thermocouple()
 
-# Inicjalizacja GUI
-regulation_desk()
+# Inicjalizacja GUI i wykresu
+root.geometry("700x750") # Zwiększ rozmiar okna, aby pomieścić wykres
+root.title("Kiln Control System")
+setup_gui() # Wywołaj nową funkcję konfiguracji GUI
 
-# Utworzenie pliku CSV
-file = open("dane_biskwit_2025-02-14_1400.csv", mode="a", newline="", encoding="utf-8")
-writer = csv.writer(file)
+# Utworzenie pliku CSV - przeniesione po setup_gui()
+file = open(f"dane_{curve_var.get().lower()}_{time.strftime('%Y-%m-%d_%H%M')}.csv", mode="a", newline="", encoding="utf-8")
 
 try:
     # Główna pętla programu
     start_time = time.time()
     current_time = start_time
     while True:
-        
-        #Przejście przez zero
+        # ... (logika sterowania TRIAC bez zmian) ...
         if lgpio.gpio_read(h, ZERO_CROSS_PIN) == 0 and permision == 1:
-            # Włączenie optotriaka
             lgpio.gpio_write(h, TRIAC_PIN, 1)
-            time.sleep(on_delay/1000)            
-
-            # Wyłączenie optotriaka - tylko poniej granicznej wartości
-            if(on_delay < 1000):
-                lgpio.gpio_write(h, TRIAC_PIN, 0)    
-                time.sleep(off_delay/1000)
-                permision = 0
-
+            time.sleep(on_delay/1000)
+            lgpio.gpio_write(h, TRIAC_PIN, 0)
+            #time.sleep(off_delay/1000) # Czy off_delay jest potrzebne? Zwykle steruje się tylko czasem włączenia
+            permision = 0
         if lgpio.gpio_read(h, ZERO_CROSS_PIN) == 1:
-            permision = 1
+             permision = 1
 
-        # Aktualizacja wskazań miernika PZEM-004T co 1 sekundę
-        if time.time() - current_time >= 1:            
-            elapsed_time = time.time() - start_time + add_time            
-            update_temperature(thermocouple)
-            update_pzem_data(pzem)
-            update_temp_and_humidity(i2c)
-            update_time()
-            write_data(file)
-            current_time = time.time()
-            temperature_expected_var.set(f"{get_expected_temperature():.2f}")
-            update_PID()
-            #update_progress()
 
+        # Aktualizacja danych i wykresu co 0.5 sekundy
+        if time.time() - current_time >= 0.5:
+            elapsed_time = time.time() - start_time  # elapsed_time będzie już uwzględniał add_time
+            current_pzem_time = time.time() # Zapisz czas przed odczytami
+
+            # Odczyty sensorów i obliczenia
+            try: update_temperature(thermocouple)
+            except Exception as e: print(f"Error updating temperature: {e}")
+            try: update_pzem_data(pzem)
+            except Exception as e: print(f"Error updating PZEM data: {e}")
+            try:
+                 expected_temp = get_expected_temperature()
+                 temperature_expected_var.set(f"{expected_temp:.2f}")
+            except Exception as e: print(f"Error getting expected temperature: {e}")
+            try: update_PID() # Oblicz nowe sterowanie PID
+            except Exception as e: print(f"Error updating PID: {e}")
+
+            # Aktualizacja GUI i zapisu danych
+            try: update_time() # Aktualizuje etykiety czasu i postępu
+            except Exception as e: print(f"Error updating time labels: {e}")
+            try: write_data(file)
+            except Exception as e: print(f"Error writing data: {e}")
+
+            # === Aktualizacja wykresu ===
+            try:
+                if temp_plot: # Sprawdź czy wykres istnieje
+                    # Użyj wartości ze zmiennych Tkinter lub bezpośrednio z obliczeń
+                    actual = float(temperature_approximate_var.get())
+                    expected = float(temperature_expected_var.get())
+                    # Używamy elapsed_time bezpośrednio
+                    #print(f"Updating plot: time={elapsed_time:.2f}, actual={actual}, expected={expected}") # Debug
+                    # Sprawdź, czy czas nie przekracza maksymalnego czasu harmonogramu
+                    max_time = max(temperature_schedule.keys()) * 3600
+                    if elapsed_time <= max_time:
+                        # Aktualizuj wykres
+                        temp_plot.update_plot(elapsed_time, actual, expected)
+                        # Odśwież wykres
+                        temp_plot.canvas.draw()
+                        temp_plot.canvas.flush_events()
+                        # Wyświetl aktualną pozycję pionowej linii
+            except Exception as e:
+                print(f"Error updating plot: {e}")
+            # ==========================
+
+            # Zaktualizuj current_time na koniec pętli aktualizacji
+            current_time = current_pzem_time # Użyj zapisanego czasu dla dokładności interwału
+
+
+        # Odświeżenie GUI Tkinter
         root.update_idletasks()
-        root.update()          
-          
-except KeyboardInterrupt:    
+        root.update()
+
+except KeyboardInterrupt:
     triac_pin_set_zero()
     print("Zatrzymano program przerwaniem.")
 finally:
     file.close()
+    lgpio.gpiochip_close(h)

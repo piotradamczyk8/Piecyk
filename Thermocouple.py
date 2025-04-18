@@ -1,4 +1,3 @@
-import time
 import spidev
 
 class Thermocouple:
@@ -10,8 +9,8 @@ class Thermocouple:
     def __init__(self):
         self.spi = spidev.SpiDev()
         self.spi.open(0, 1)
-        self.spi.max_speed_hz = 50000
-        self.last_valid_temperature = None
+        self.spi.max_speed_hz = 5000
+        self.last_valid_temperature = True
 
     def read_max31855(self):
         raw_data = self.spi.xfer2([0x00, 0x00, 0x00, 0x00])
@@ -36,4 +35,3 @@ class Thermocouple:
         
         self.last_valid_temperature = temperature  # Zapisujemy ostatnią poprawną temperaturę
         return temperature
-
