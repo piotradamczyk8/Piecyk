@@ -34,4 +34,4 @@ class Thermocouple:
                 break
         
         self.last_valid_temperature = temperature  # Zapisujemy ostatnią poprawną temperaturę
-        return temperature
+        return 100 #temperature

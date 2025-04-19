@@ -16,6 +16,7 @@ from Thermocouple import Thermocouple
 from TemperatureApproximator import TemperatureApproximator
 from PIDController import PIDController
 from src.classes.TemperatureCurves import TemperatureCurves
+from src.classes.LEDIndicator import LEDIndicator
 
 ################################################
 # Stałe
@@ -25,7 +26,7 @@ TRIAC_PIN = 24       # Pin sterujący optotriakiem
 FREQ = 50            # Częstotliwość sieci w Hz (np. 50Hz)
 HALF_CYCLE = (1 / FREQ) / 2  # Połówka okresu
 POWER = 1
-DELAY = HALF_CYCLE
+DELAY = HALF_CYCLE 
 
 def time_to_seconds(time_str):
     """Convert time in hh:mm format to seconds."""
@@ -137,6 +138,7 @@ Glazing_express = {
 }
 
 temp_calc = TemperatureApproximator()
+led_indicator = LEDIndicator(root)
 
 ##############################################
 # Klasa do obsługi wykresu
@@ -523,7 +525,7 @@ def write_data(file_handle):
     # GUI
 ############################################
 def setup_gui():
-    global frame, temp_plot, initial_time_var, progress_bar
+    global frame, temp_plot, initial_time_var, progress_bar, led_indicator
 
     # Frame for controls (upper part)
     controls_frame = tk.Frame(root)
@@ -603,6 +605,13 @@ def setup_gui():
 
     # Set initial schedule on the plot
     set_temperature_schedule(curve_var)
+
+    # Initialize LED indicator
+    led_indicator = LEDIndicator(plot_frame)
+    led_indicator.place(relx=0.95, rely=0.05, anchor="ne")
+    led_indicator.configure(bg="white")
+    led_indicator.configure(width=20)
+    led_indicator.configure(height=20)
 
 # Usunięcie starego tworzenia ramki
 # frame = tk.Frame(root)
@@ -724,7 +733,7 @@ i2c = busio.I2C(board.SCL, board.SDA)
 thermocouple = Thermocouple()
 
 # Inicjalizacja GUI i wykresu
-root.geometry("700x750") # Zwiększ rozmiar okna, aby pomieścić wykres
+root.geometry("900x1000") # Zwiększ rozmiar okna, aby pomieścić wykres
 root.title("Kiln Control System")
 setup_gui() # Wywołaj nową funkcję konfiguracji GUI
 
@@ -736,16 +745,19 @@ try:
     start_time = time.time()
     current_time = start_time
     while True:
-        # ... (logika sterowania TRIAC bez zmian) ...
-        if lgpio.gpio_read(h, ZERO_CROSS_PIN) == 0 and permision == 1:
+
+        if on_delay > 0:
             lgpio.gpio_write(h, TRIAC_PIN, 1)
+            led_indicator.turn_on()
+            root.update()
             time.sleep(on_delay/1000)
             lgpio.gpio_write(h, TRIAC_PIN, 0)
-            #time.sleep(off_delay/1000) # Czy off_delay jest potrzebne? Zwykle steruje się tylko czasem włączenia
-            permision = 0
-        if lgpio.gpio_read(h, ZERO_CROSS_PIN) == 1:
-             permision = 1
-
+            led_indicator.turn_off()
+            root.update()
+            time.sleep(1 - on_delay/1000) # Czy off_delay jest potrzebne? Zwykle steruje się tylko czasem włączenia
+        else:
+            time.sleep(1)
+  
 
         # Aktualizacja danych i wykresu co 0.5 sekundy
         if time.time() - current_time >= 0.5:
@@ -767,10 +779,8 @@ try:
             # Aktualizacja GUI i zapisu danych
             try: update_time() # Aktualizuje etykiety czasu i postępu
             except Exception as e: print(f"Error updating time labels: {e}")
-            try: write_data(file)
-            except Exception as e: print(f"Error writing data: {e}")
 
-            # === Aktualizacja wykresu ===
+             # === Aktualizacja wykresu ===
             try:
                 if temp_plot: # Sprawdź czy wykres istnieje
                     # Użyj wartości ze zmiennych Tkinter lub bezpośrednio z obliczeń
@@ -790,6 +800,7 @@ try:
             except Exception as e:
                 print(f"Error updating plot: {e}")
             # ==========================
+
 
             # Zaktualizuj current_time na koniec pętli aktualizacji
             current_time = current_pzem_time # Użyj zapisanego czasu dla dokładności interwału

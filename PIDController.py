@@ -11,7 +11,7 @@ class PIDController:
         :param Kd: Wzmocnienie różniczkowe
         """
         self.pid = PID(Kp, Ki, Kd, setpoint=setpoint) 
-        self.pid.output_limits = (0, 10000)
+        self.pid.output_limits = (0, 500)
 
     
     def set_target_temperature(self, temperature):

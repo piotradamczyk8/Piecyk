@@ -5,11 +5,11 @@ from pymodbus import FramerType
 from pymodbus.client import ModbusSerialClient
 
 class PZEM_004T:
-    voltage = 0
-    current = 0
-    power = 0
-    energy = 0
-    frequency = 0    
+    voltage = 240
+    current = 2
+    power = 200
+    energy = 2000
+    frequency = 50    
 
     def __init__(self, port='/dev/ttyAMA0', baudrate=9600, timeout=1):
         self.client = ModbusSerialClient(
