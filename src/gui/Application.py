@@ -4,7 +4,7 @@ from src.gui.MainWindow import MainWindow
 from src.gui.frames.ControlsFrame import ControlsFrame
 from src.gui.frames.InfoFrame import InfoFrame
 from src.gui.frames.PlotFrame import PlotFrame
-from src.gui.frames.IRControlFrame import IRControlFrame
+from src.gui.frames.IRFrame import IRFrame
 from src.gui.frames.InitialTimeFrame import InitialTimeFrame
 from src.gui.frames.PowerControlFrame import PowerControlFrame
 from src.gui.frames.PIDControlFrame import PIDControlFrame
@@ -25,9 +25,9 @@ class Application:
         
         # Inicjalizacja ramek
         self.controls_frame = ControlsFrame(self.root)
-        self.info_frame = InfoFrame(self.root)
+        #self.info_frame = InfoFrame(self.root)
         self.plot_frame = PlotFrame(self.root)
-        self.ir_control_frame = IRControlFrame(self.root)
+        self.ir_frame = IRFrame(self.root)
         self.initial_time_frame = InitialTimeFrame(self.root)
         self.power_control_frame = PowerControlFrame(self.root)
         self.pid_control_frame = PIDControlFrame(self.root)
@@ -53,8 +53,8 @@ class Application:
         
         # Kontrolki w prawej ramce
         self.controls_frame.get_frame().pack(fill=tk.X, pady=5)
-        self.info_frame.get_frame().pack(fill=tk.X, pady=5)
-        self.ir_control_frame.get_frame().pack(fill=tk.X, pady=5)
+        #self.info_frame.get_frame().pack(fill=tk.X, pady=5)
+        self.ir_frame.get_frame().pack(fill=tk.X, pady=5)
         self.initial_time_frame.get_frame().pack(fill=tk.X, pady=5)
         self.power_control_frame.get_frame().pack(fill=tk.X, pady=5)
         self.pid_control_frame.get_frame().pack(fill=tk.X, pady=5)
@@ -82,8 +82,8 @@ class Application:
     def get_info_frame(self):
         return self.info_frame
         
-    def get_ir_control_frame(self):
-        return self.ir_control_frame
+    def get_ir_frame(self):
+        return self.ir_frame
         
     def get_initial_time_frame(self):
         return self.initial_time_frame

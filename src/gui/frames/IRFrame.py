@@ -1,7 +1,7 @@
 import tkinter as tk
 from tkinter import ttk
 
-class IRControlFrame:
+class IRFrame:
     def __init__(self, parent):
         self.frame = tk.Frame(parent)
         self.frame.pack(pady=5)

@@ -1,6 +1,9 @@
 import spidev
 
 class Thermocouple:
+
+    DEBUG = 1
+
     corrections = {
         300: 0,
         500: 0
@@ -13,6 +16,8 @@ class Thermocouple:
         self.last_valid_temperature = True
 
     def read_max31855(self):
+        if self.DEBUG:
+            return 100
         raw_data = self.spi.xfer2([0x00, 0x00, 0x00, 0x00])
         raw_value = (raw_data[0] << 24) | (raw_data[1] << 16) | (raw_data[2] << 8) | raw_data[3]
         
@@ -34,4 +39,5 @@ class Thermocouple:
                 break
         
         self.last_valid_temperature = temperature  # Zapisujemy ostatnią poprawną temperaturę
+
         return temperature

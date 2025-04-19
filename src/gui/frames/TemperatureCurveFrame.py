@@ -11,12 +11,19 @@ class TemperatureCurveFrame:
         self.curve_var = tk.StringVar()
         self.curves = TemperatureCurves()
         
+        # Ustawienie wartości początkowej
+        curve_names = self.curves.get_curve_names()
+        if curve_names:
+            self.curve_var.set(curve_names[0])
+        
         self._create_widgets()
         
     def _create_widgets(self):
         # Etykieta i menu wyboru krzywej
         tk.Label(self.frame, text="Temperature Curve:").grid(row=0, column=0, padx=5, sticky="w")
-        self.curve_menu = tk.OptionMenu(self.frame, self.curve_var, *self.curves.get_curve_names())
+        
+        # Utworzenie menu z wartością początkową i opcjami
+        self.curve_menu = tk.OptionMenu(self.frame, self.curve_var, self.curve_var.get(), *self.curves.get_curve_names())
         self.curve_menu.grid(row=0, column=1, padx=5, sticky="w")
         
         # Przycisk SET

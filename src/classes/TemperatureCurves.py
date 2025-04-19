@@ -193,13 +193,34 @@ class TemperatureCurves:
 
         return prev_temp
 
+    def get_selected_curve(self) -> str:
+        """Zwraca nazwę aktualnie wybranej krzywej temperatury."""
+        if not self.curves:
+            return None
+        # Zwróć pierwszą dostępną krzywą
+        return next(iter(self.curves.keys()))
+
     def get_current_stage(self, elapsed_time: int) -> str:
         """Zwraca nazwę aktualnego etapu dla danego czasu."""
         if elapsed_time < 0:
             return "Nie rozpoczęto"
             
-        for stage in self.schedule:
-            if stage["time"] <= elapsed_time < stage["time"] + stage["duration"]:
-                return stage["name"]
+        # Pobierz aktualnie wybraną krzywą
+        selected_curve = self.get_selected_curve()
+        if not selected_curve:
+            return "Brak wybranej krzywej"
+            
+        # Pobierz dane krzywej
+        curve_data = self.curves.get(selected_curve, [])
+        if not curve_data:
+            return "Brak danych krzywej"
+            
+        # Znajdź aktualny etap
+        for i in range(len(curve_data) - 1):
+            current_time, _, current_stage = curve_data[i]
+            next_time, _, _ = curve_data[i + 1]
+            if current_time <= elapsed_time < next_time:
+                return current_stage
                 
+        # Jeśli czas jest poza zakresem
         return "Zakończono" 

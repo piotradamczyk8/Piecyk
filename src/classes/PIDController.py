@@ -1,17 +1,19 @@
 from simple_pid import PID
 
 class PIDController:
-    def __init__(self, setpoint=800, Kp=2.0, Ki=0.1, Kd=0.05):
+    def __init__(self, setpoint=800, kp=2.0, ki=0.1, kd=0.05, min_output=0, max_output=10000):
         """
         Inicjalizuje regulator PID.
 
         :param setpoint: Docelowa temperatura pieca (°C)
-        :param Kp: Wzmocnienie proporcjonalne
-        :param Ki: Wzmocnienie całkowe
-        :param Kd: Wzmocnienie różniczkowe
+        :param kp: Wzmocnienie proporcjonalne
+        :param ki: Wzmocnienie całkowe
+        :param kd: Wzmocnienie różniczkowe
+        :param min_output: Minimalna wartość wyjściowa
+        :param max_output: Maksymalna wartość wyjściowa
         """
-        self.pid = PID(Kp, Ki, Kd, setpoint=setpoint) 
-        self.pid.output_limits = (0, 10000)
+        self.pid = PID(kp, ki, kd, setpoint=setpoint) 
+        self.pid.output_limits = (min_output, max_output)
 
     
     def set_target_temperature(self, temperature):

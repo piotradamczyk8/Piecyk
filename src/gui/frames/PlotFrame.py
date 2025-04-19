@@ -15,7 +15,7 @@ class PlotFrame:
         self.canvas_widget.pack(fill=tk.BOTH, expand=True)
         
         # Inicjalizacja klasy TemperaturePlot
-        self.temperature_plot = TemperaturePlot(self.fig, self.canvas, self.canvas_widget)
+        self.temperature_plot = TemperaturePlot(self.frame)
         
     def get_frame(self):
         return self.frame
