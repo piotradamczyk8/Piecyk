@@ -1,181 +1,492 @@
 import lgpio
 import time
+import tkinter as tk
+from tkinter import ttk
+import board
+import busio
+import adafruit_sht31d
 import csv
-from datetime import datetime
-from src.gui.Application import Application
-from src.classes.PZEM_004T import PZEM_004T
-from src.classes.Thermocouple import Thermocouple
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+
+from src.classes.devices.PZEM_004T import PZEM_004T
+from src.classes.devices.Thermocouple import Thermocouple
 from src.classes.TemperatureApproximator import TemperatureApproximator
 from src.classes.PIDController import PIDController
 from src.classes.TemperatureCurves import TemperatureCurves
-from src.gui.frames.InfoFrame import InfoFrame
+from src.classes.gui.LEDIndicator import LEDIndicator
+from src.classes.gui.TemperaturePlot import TemperaturePlot
+from src.classes.gui.GUISetup import GUISetup
 from src.classes.Config import Config
-from src.classes.LEDIndicator import LEDIndicator
+from src.classes.gui.PowerControl import PowerControl
 
-# Inicjalizacja konfiguracji
+################################################
+# Stałe
+##############################################
 config = Config()
+ZERO_CROSS_PIN = config.get_gpio_pin('ZERO_CROSS_PIN')
+TRIAC_PIN = config.get_gpio_pin('TRIAC_PIN')
+FREQ = config.get_power_value('FREQ')
+HALF_CYCLE = config.get_power_value('HALF_CYCLE')
+POWER = config.get_power_value('POWER')
+DELAY = config.get_power_value('DELAY')
+MAX_TIME_ON = config.get_power_value('MAX_TIME_ON')
 
-# Inicjalizacja GPIO
-h = lgpio.gpiochip_open(config.getint("GPIO", "gpio_chip"))
-TRIAC_PIN = config.getint("GPIO", "triac_pin")
-lgpio.gpio_claim_output(h, TRIAC_PIN)
-lgpio.gpio_write(h, TRIAC_PIN, 0)
+def time_to_seconds(time_str):
+    """Convert time in hh:mm format to seconds."""
+    hours, minutes = map(int, time_str.split(':'))
+    return hours * 3600 + minutes * 60
 
-# Inicjalizacja PZEM
-pzem = PZEM_004T(
-    port=config.get("PZEM", "port"),
-    baudrate=config.getint("PZEM", "baudrate"),
-    address=config.getint("PZEM", "address")
-)
+def seconds_to_time(seconds):
+    """Convert seconds to time in hh:mm format."""
+    hours = seconds // 3600
+    minutes = (seconds % 3600) // 60
+    return f"{hours:02}:{minutes:02}"
 
-# Inicjalizacja termopary
-thermocouple = Thermocouple(
-    cs_pin=config.getint("Thermocouple", "cs_pin"),
-    clock_pin=config.getint("Thermocouple", "clock_pin"),
-    data_pin=config.getint("Thermocouple", "data_pin"),
-    max_temperature=config.getfloat("Thermocouple", "max_temperature"),
-    min_temperature=config.getfloat("Thermocouple", "min_temperature")
-)
-
-temperature_approximator = TemperatureApproximator()
-
-# Inicjalizacja PID
-pid = PIDController(
-    kp=config.getfloat("PID", "kp"),
-    ki=config.getfloat("PID", "ki"),
-    kd=config.getfloat("PID", "kd"),
-    min_output=config.getfloat("PID", "min_output"),
-    max_output=config.getfloat("PID", "max_output")
-)
-
-# Inicjalizacja krzywych temperatury
-temperature_curves = TemperatureCurves(curves_dir=config.get("Files", "curves_dir"))
-
-# Inicjalizacja InfoFrame
-info_frame = InfoFrame()
-
-# Inicjalizacja LEDIndicator
-led_indicator = LEDIndicator()
-
-# Inicjalizacja pliku CSV
-csv_file = open(config.get("Files", "data_file"), 'w', newline='')
-csv_writer = csv.writer(csv_file)
-csv_writer.writerow(['Time', 'Thermocouple', 'Approximate', 'Expected', 'Power'])
-
+##############################################
 # Zmienne globalne
+##############################################
+root = tk.Tk()
+curve_var = tk.StringVar(value=config.get_gui_value('DEFAULT_CURVE')) # Domyślna wartość z config
+temp_plot = None # Globalna zmienna dla obiektu wykresu
+progress_var = tk.DoubleVar(value=0) # Zmienna dla paska postępu
+progress_bar = None # Globalna zmienna dla paska postępu
+temperature_schedule = {}  # Dodajemy globalną zmienną dla harmonogramu temperatury
+
+permision = 1
+off_delay = 0
+on_delay = 0
+impulse_prev_var = tk.DoubleVar(value=0)
+spinbox_impulse_prev = tk.Spinbox(root, from_=0, to=5000, increment=1, textvariable=impulse_prev_var, width=5)
+impulse_after_var = tk.DoubleVar(value=0)
+spinbox_impulse_after = tk.Spinbox(root, from_=0, to=5000, increment=1, textvariable=impulse_after_var, width=5)
+voltage_var = tk.DoubleVar(value="0.0")
+current_var = tk.DoubleVar(value="0.0")
+power_var = tk.DoubleVar(value="0.0")
+energy_var = tk.DoubleVar(value="0.0")
+freq_var = tk.DoubleVar(value="0.0")
+cycle_var = tk.DoubleVar(value="0.0")
+temperature_thermocouple_var = tk.DoubleVar(value="0.0")
+bottom_cover_temperature = tk.DoubleVar(value="0.0")
+humidity = tk.DoubleVar(value="0.0")
+elapsed_time_var = tk.StringVar(value="00:00:00")
+remaining_time_var = tk.StringVar(value="00:00:00")
+final_time_var = tk.StringVar(value="00:00")
+temperature_ir_var = tk.DoubleVar(value="0.0")
+temperature_expected_var = tk.DoubleVar(value="0.0")
+temperature_approximate_var = tk.DoubleVar(value="0.0")
 elapsed_time = 0
-add_time = 0
-start_time = 0
-current_power = 0
-current_cycle = 0
-max_cycles = config.getint("Control", "max_cycles")
-is_running = True
+remaining_time = 0
+add_time = time_to_seconds("00:00") # Dodatkowy
+progres_var_percent = tk.StringVar(value="0")
 
-def update_time():
-    global elapsed_time, start_time
-    if start_time > 0:
-        elapsed_time = time.time() - start_time + add_time
-    return elapsed_time
+temperature_curves = TemperatureCurves()
+curves = temperature_curves.get_curves()
 
-def update_data():
-    global elapsed_time, remaining_time, final_time, cycle, impulse_after, voltage, current, power, energy
-    global temperature_thermocouple, temperature_approximate, temperature_expected
-    
-    # Pobierz aktualny etap
-    current_stage = temperature_curves.get_current_stage(elapsed_time)
-    
-    # Aktualizuj dane w InfoFrame
-    info_frame.update_data({
-        "Current Stage": current_stage,
-        "Time": f"{elapsed_time}/{final_time}",
-        "Temperature": f"{temperature_thermocouple:.1f}°C",
-        "Power": f"{power:.1f}W",
-        "Energy": f"{energy:.1f}Wh",
-        "Cycles": cycle
-    })
-    
-    while is_running:
-        # Aktualizacja czasu
-        current_time = update_time()
-        
-        # Odczyt temperatury z termopary
-        thermocouple_temp = thermocouple.read_temperature()
-        temperature_approximator.update(thermocouple_temp)
-        approximate_temp = temperature_approximator.get_temperature()
-        
-        # Pobranie oczekiwanej temperatury z krzywej
-        expected_temp = temperature_curves.get_expected_temperature(current_time)
-        
-        # Obliczenie mocy z PID
-        power = pid.compute(approximate_temp, expected_temp)
-        current_power = max(0, min(config.getfloat("Control", "max_power"), power))
-        
-        # Aktualizacja triaka
-        if current_cycle < max_cycles:
-            if current_cycle < (current_power / 100.0) * max_cycles:
-                lgpio.gpio_write(h, TRIAC_PIN, 1)
-                led_indicator.set_state(True)  # Włącz LED gdy triak jest włączony
-            else:
-                lgpio.gpio_write(h, TRIAC_PIN, 0)
-                led_indicator.set_state(False)  # Wyłącz LED gdy triak jest wyłączony
-            current_cycle = (current_cycle + 1) % max_cycles
-        
-        # Zapis danych do CSV
-        csv_writer.writerow([
-            datetime.now().strftime('%H:%M:%S'),
-            f"{thermocouple_temp:.1f}",
-            f"{approximate_temp:.1f}",
-            f"{expected_temp:.1f}",
-            f"{current_power:.1f}"
-        ])
-        csv_file.flush()
-        
-        time.sleep(config.getfloat("Control", "update_interval"))
+description = temperature_curves.get_curve_stage("Bisquit", "01:36:02") 
+
+
+temp_calc = TemperatureApproximator()
+led_indicator = LEDIndicator(root)
+
+##############################################
+# Funkcje pomocnicze
+##############################################
+
+def setup_gpio():
+    global h
+    h = lgpio.gpiochip_open(0)
+    lgpio.gpio_claim_input(h, ZERO_CROSS_PIN)
+    lgpio.gpio_claim_output(h, TRIAC_PIN)
+    lgpio.gpio_write(h, TRIAC_PIN, 0)
 
 def stop_program():
-    """Bezpieczne zakończenie programu"""
-    global is_running
-    is_running = False
-    
     try:
-        # Wyłącz triak
-        lgpio.gpio_write(h, TRIAC_PIN, 0)
-        led_indicator.set_state(False)  # Wyłącz LED przy zamykaniu programu
-        
-        # Zamknij plik CSV
-        if 'csv_file' in globals() and csv_file:
-            csv_file.close()
-            print("Zamknięto plik CSV")
-            
-        # Zamknij połączenie GPIO
-        if 'h' in globals() and h:
-            lgpio.gpiochip_close(h)
-            print("Zamknięto połączenie GPIO")
-            
-        print("Program zakończony pomyślnie")
-        
+        triac_pin_set_zero()
+        lgpio.gpiochip_close(h)
     except Exception as e:
-        print(f"Błąd przy zamykaniu programu: {e}")
+        print(f"Błąd przy zamykaniu GPIO: {e}")
+    print("Zatrzymano program przyciskiem")
+    root.quit()  # Zamiast exit(0) używamy root.quit()
 
-def main():
-    # Inicjalizacja aplikacji
-    app = Application(
-        title=config.get("GUI", "window_title"),
-        width=config.getint("GUI", "window_width"),
-        height=config.getint("GUI", "window_height")
+def triac_pin_set_zero():
+    lgpio.gpio_claim_output(h, TRIAC_PIN)
+    lgpio.gpio_write(h, TRIAC_PIN, 0)  
+
+def regulation_desk():        
+    root.geometry(f"{config.get_gui_value('WINDOW_WIDTH')}x{config.get_gui_value('WINDOW_HEIGHT')}")
+    root.title("Kiln Control System")
+
+def clear_inputs():
+    global off_delay, on_delay
+    spinbox_impulse_prev.delete(0, 'end')
+    spinbox_impulse_prev.insert(0, '0')
+    spinbox_impulse_after.delete(0, 'end')
+    spinbox_impulse_after.insert(0, '0')
+    off_delay = 0
+    on_delay = 0
+
+def set_inputs():
+    global off_delay, on_delay
+    off_delay = float(spinbox_impulse_prev.get())
+    on_delay = float(spinbox_impulse_after.get())
+
+def set_temperature_ir():
+    temperature_ir_var.set(float(spinbox_temperature_ir_var.get()))
+    temp_calc.update_ir_temperature(float(spinbox_temperature_ir_var.get()), float(temperature_thermocouple_var.get()))
+     
+# Funkcja do aktualizacji danych z PZEM-004T
+def update_pzem_data(pzem):
+    pzem.read_data()
+    voltage_var.set(f"{pzem.get_voltage():.2f}")
+    current_var.set(f"{pzem.get_current():.2f}")
+    power_var.set(f"{pzem.get_power():.2f}")
+    energy_var.set(f"{pzem.get_energy():}")
+    freq_var.set(f"{pzem.get_frequency():.2f}")
+    cycle_var.set(f"{round(1000/float(pzem.get_frequency()), 2):.2f}")
+
+def update_temperature(thermocouple):
+    temp_calc.update_thermocouple_temperature(thermocouple.read_max31855()) 
+    temperature_thermocouple_var.set(f"{thermocouple.read_max31855():.2f}")    
+    temperature_approximate_var.set(temp_calc.get_approximate_temperature())
+    
+def update_temp_and_humidity(i2c):    
+    sensor = adafruit_sht31d.SHT31D(i2c)
+    bottom_cover_temperature.set(f"{sensor.temperature:.2f}")
+    humidity.set(f"{sensor.relative_humidity:.2f}")
+    
+def update_time():
+    global elapsed_time, remaining_time, progres_var_percent
+    hours, remainder = divmod(int(elapsed_time), 3600)
+    minutes, seconds = divmod(remainder, 60)
+    elapsed_time_var.set(f"{hours:02}:{minutes:02}:{seconds:02}")
+    
+    print(f"Elapsed time: {hours:02}:{minutes:02}:{seconds:02}")
+
+    # Oblicz pozostały czas na podstawie harmonogramu
+    total_schedule_time = max(temperature_schedule.keys()) * 3600
+    remaining_time = max(0, total_schedule_time - elapsed_time)
+    
+    hours, remainder = divmod(int(remaining_time), 3600)
+    minutes, seconds = divmod(remainder, 60)
+    remaining_time_var.set(f"{hours:02}:{minutes:02}:{seconds:02}") 
+
+    # Oblicz postęp
+    if total_schedule_time > 0:
+        progress = (elapsed_time / total_schedule_time) * 100
+        progress_var.set(progress)  # Aktualizuj wartość paska postępu
+        if progress_bar:  # Sprawdź czy progress_bar istnieje
+            progress_bar.update()  # Wymuś odświeżenie paska postępu
+    else:
+        progress_var.set(0)
+        if progress_bar:
+            progress_bar.update()
+
+    # Oblicz przewidywany czas zakończenia
+    final_time = time.strftime("%H:%M:%S", time.localtime(time.time() + remaining_time + add_time))
+    final_time_var.set(final_time)
+
+    progres_var_percent.set(f"{progress:.2f}%")
+
+    
+def update_PID():
+    global elapsed_time, on_delay, impulse_after_var
+    setpoint = get_expected_temperature()
+    pid = PIDController(setpoint, 
+                       Kp=config.get_pid_value('Kp'), 
+                       Ki=config.get_pid_value('Ki'), 
+                       Kd=config.get_pid_value('Kd'))
+    on_delay = int(pid.compute_power(temperature_approximate_var.get())) #czas w ms do sterowania triakiem
+    impulse_after_var.set(on_delay)
+
+def get_expected_temperature() -> float:
+    """Zwraca oczekiwaną temperaturę dla aktualnego czasu w wybranej krzywej."""
+    global elapsed_time, temperature_schedule
+    
+    # Konwertuj czas na format HH:MM:SS
+    hours = int(elapsed_time // 3600)
+    minutes = int((elapsed_time % 3600) // 60)
+    seconds = int(elapsed_time % 60)
+    time_str = f"{hours:02}:{minutes:02}:{seconds:02}"
+    
+    # Pobierz temperaturę z klasy TemperatureCurves
+    temperature = temperature_curves.get_expected_temperature(curve_var.get(), time_str)
+    
+    if temperature is None:
+        return 0.0  # Domyślna wartość w przypadku błędu
+        
+    return temperature
+
+def write_data(file_handle):
+    global spinbox_impulse_prev, spinbox_impulse_after
+
+    data = [{"elapsed_time_var": str(elapsed_time_var.get()), 
+            "Triac off": str(spinbox_impulse_prev.get()),
+            "Triac on": str(spinbox_impulse_after.get()),
+            "temperature thermocouple": str(temperature_thermocouple_var.get()),
+            "temperature_ir": temperature_ir_var.get(),
+            "temperature_approximate": str(temperature_approximate_var.get()),
+            "temperature_expected": str(temperature_expected_var.get()),
+            "bottom_cover_temperature": f"{bottom_cover_temperature.get()}",
+            "humidity": f"{humidity.get()}",
+            "voltage": f"{voltage_var.get()}",
+            "current": f"{current_var.get()}",
+            "power": f"{power_var.get()}",
+            "energy": f"{energy_var.get()}",
+            "freq": f"{freq_var.get()}",
+            "cycle": f"{cycle_var.get()}"
+            }]
+
+    fieldnames = [
+        "elapsed_time_var", 
+        "Triac off", 
+        "Triac on", 
+        "temperature thermocouple",
+        "temperature_ir",
+        "temperature_approximate",
+        "temperature_expected",
+        "bottom_cover_temperature",
+        "humidity",
+        "voltage",
+        "current",
+        "power",
+        "energy",
+        "freq",
+        "cycle"
+    ]
+
+    writer = csv.DictWriter(file_handle, fieldnames=fieldnames)
+
+    # Jeśli plik jest nowy i pusty, dodaj nagłówek (sprawdzamy czy kursor jest na początku)
+    if file_handle.tell() == 0:
+        writer.writeheader()
+
+    writer.writerows(data)  # Zapisanie danych
+
+############################################
+    # GUI
+############################################
+def setup_gui():
+    """Konfiguruje interfejs użytkownika."""
+    global frame, temp_plot, initial_time_var, progress_bar, led_indicator
+
+    gui_setup = GUISetup(
+        root=root,
+        curve_var=curve_var,
+        progress_var=progress_var,
+        elapsed_time_var=elapsed_time_var,
+        remaining_time_var=remaining_time_var,
+        final_time_var=final_time_var,
+        cycle_var=cycle_var,
+        impulse_after_var=impulse_after_var,
+        voltage_var=voltage_var,
+        current_var=current_var,
+        power_var=power_var,
+        energy_var=energy_var,
+        temperature_thermocouple_var=temperature_thermocouple_var,
+        temperature_approximate_var=temperature_approximate_var,
+        temperature_expected_var=temperature_expected_var,
+        temperature_ir_var=temperature_ir_var,
+        bottom_cover_temperature=bottom_cover_temperature,
+        humidity=humidity,
+        progres_var_percent=progres_var_percent,
+        curve_description=temperature_curves.get_curve_stage(curve_var.get(), "00:00:00")  # Pobieramy opis dla początkowego czasu
     )
-    
-    # Uruchomienie wątku aktualizacji danych
-    import threading
-    data_thread = threading.Thread(target=update_data)
-    data_thread.daemon = True
-    data_thread.start()
-    
-    # Uruchomienie aplikacji
-    app.run()
-    
-    # Zamknięcie programu
-    stop_program()
 
-if __name__ == "__main__":
-    main() 
+    gui_setup.setup_gui(set_temperature_schedule, set_initial_time, set_temperature_ir, stop_program)
+
+    # Przypisz wartości zwracane przez GUISetup do zmiennych globalnych
+    frame = gui_setup.frame
+    temp_plot = gui_setup.get_temp_plot()
+    initial_time_var = gui_setup.get_initial_time_var()
+    progress_bar = gui_setup.get_progress_bar()
+    led_indicator = gui_setup.get_led_indicator()
+
+def set_temperature_schedule(curve_tk_var):
+    """Ustawia harmonogram temperatury na podstawie wybranej krzywej."""
+    global temperature_schedule, temp_plot, elapsed_time, start_time
+    selected_curve_name = curve_tk_var.get()
+
+    # Pobierz harmonogram z klasy TemperatureCurves
+    temperature_schedule = temperature_curves.get_curve(selected_curve_name)
+    if temperature_schedule is None:
+        print(f"Nie znaleziono krzywej: {selected_curve_name}")
+        return
+
+    print(f"Wybrano krzywą: {selected_curve_name}")
+    if temp_plot:
+        # Resetuj czas przy zmianie harmonogramu
+        elapsed_time = add_time
+        start_time = time.time() - add_time
+        
+        # Wyczyść dane wykresu
+        temp_plot.time_data = []
+        temp_plot.temp_actual_data = []
+        temp_plot.temp_expected_data = []
+        temp_plot.line_actual.set_data([], [])
+        temp_plot.line_expected.set_data([], [])
+        temp_plot.line_current.set_data([], [])
+        
+        # Narysuj nowy profil
+        temp_plot.draw_expected_profile(temperature_schedule)
+        
+        # Odśwież wykres
+        temp_plot.canvas.draw()
+        temp_plot.canvas.flush_events()
+        
+        # Aktualizuj wykres z początkowymi wartościami
+        actual = float(temperature_approximate_var.get())
+        expected = float(temperature_expected_var.get())
+        temp_plot.update_plot(elapsed_time, actual, expected)
+
+def set_initial_time():
+    global add_time, elapsed_time, start_time
+    try:
+        # Pobierz wartość z pola tekstowego i przekonwertuj na sekundy
+        time_str = initial_time_var.get()
+        add_time = time_to_seconds(time_str)
+        print(f"Ustawiono początkowy czas: {time_str} ({add_time} sekund)")
+        
+        # Aktualizuj start_time i elapsed_time
+        start_time = time.time() - add_time
+        elapsed_time = add_time
+        
+        # Aktualizuj wykres
+        if temp_plot:
+            # Wyczyść dane wykresu
+            temp_plot.time_data = []
+            temp_plot.temp_actual_data = []
+            temp_plot.temp_expected_data = []
+            temp_plot.line_actual.set_data([], [])
+            temp_plot.line_expected.set_data([], [])
+            
+            # Narysuj nowy profil
+            temp_plot.draw_expected_profile(temperature_schedule)
+            
+            # Aktualizuj wykres z początkowymi wartościami
+            actual = float(temperature_approximate_var.get())
+            expected = float(temperature_expected_var.get())
+            temp_plot.update_plot(elapsed_time, actual, expected)
+           
+            # Odśwież wykres
+            temp_plot.canvas.draw()
+            temp_plot.canvas.flush_events()
+            temp_plot.canvas_widget.update_idletasks()
+            temp_plot.canvas_widget.update()
+            
+            # Aktualizuj etykiety czasu
+            update_time()
+    except Exception as e:
+        print(f"Błąd przy ustawianiu początkowego czasu: {e}")
+
+#############################
+# PROGRAM GŁÓWNY
+#############################
+
+# Inicjalizacja GPIO
+setup_gpio()
+
+# Inicjalizacja PZEM-004T
+pzem = PZEM_004T()
+
+# Inicjalizacja I2C
+i2c = busio.I2C(board.SCL, board.SDA)
+
+# Inicjalizacja termopary
+thermocouple = Thermocouple()
+
+# Inicjalizacja GUI i wykresu
+root.geometry(f"{config.get_gui_value('WINDOW_WIDTH')}x{config.get_gui_value('WINDOW_HEIGHT')}")
+root.title("Kiln Control System")
+setup_gui() # Wywołaj nową funkcję konfiguracji GUI
+
+# Utworzenie pliku CSV - przeniesione po setup_gui()
+file = open(f"dane_{curve_var.get().lower()}_{time.strftime('%Y-%m-%d_%H%M')}.csv", 
+           mode="a", 
+           newline=config.get_csv_value('NEWLINE'), 
+           encoding=config.get_csv_value('ENCODING')) 
+
+try:
+    # Główna pętla programu
+    start_time = time.time()
+    current_time = start_time
+    while True:
+
+        # Odczyty sensorów i obliczenia
+        try: 
+            update_temperature(thermocouple)
+        except Exception as e: print(f"Error updating temperature: {e}")
+
+        # Oblicz nowe sterowanie PID
+        try:
+            update_PID() 
+        except Exception as e: print(f"Error updating PID: {e}")
+
+        # Aktualizacja GUI i zapisu danych
+        try:
+            update_time() # Aktualizuje etykiety czasu i postępu
+        except Exception as e: print(f"Error updating time labels: {e}")
+
+        try:
+            expected_temp = get_expected_temperature()
+            temperature_expected_var.set(f"{expected_temp:.2f}")
+        except Exception as e: print(f"Error getting expected temperature: {e}")  
+ 
+
+        on_delay_sek = on_delay / 1000    
+        # Sterowanie triakiem
+        if on_delay_sek > 0:
+            try: 
+                update_pzem_data(pzem)
+            except Exception as e: print(f"Error updating PZEM data: {e}")     
+            lgpio.gpio_write(h, TRIAC_PIN, 1)
+            led_indicator.turn_on()
+            root.update()
+            time.sleep(on_delay_sek)
+            lgpio.gpio_write(h, TRIAC_PIN, 0)
+            led_indicator.turn_off()
+            root.update()
+            time.sleep(MAX_TIME_ON/1000 - on_delay_sek)
+  
+
+        # Aktualizacja danych i wykresu co 1 sekundę
+        if time.time() - current_time >= 1:
+            elapsed_time = time.time() - start_time  # elapsed_time będzie już uwzględniał add_time
+            current_pzem_time = time.time() # Zapisz czas przed odczytami
+            
+            # === Aktualizacja wykresu ===
+            try:
+                if temp_plot: # Sprawdź czy wykres istnieje
+                    # Użyj wartości ze zmiennych Tkinter lub bezpośrednio z obliczeń
+                    actual = float(temperature_approximate_var.get())
+                    expected = float(temperature_expected_var.get())
+                    # Używamy elapsed_time bezpośrednio
+                    #print(f"Updating plot: time={elapsed_time:.2f}, actual={actual}, expected={expected}") # Debug
+                    # Sprawdź, czy czas nie przekracza maksymalnego czasu harmonogramu
+                    max_time = max(temperature_schedule.keys()) * 3600
+                    if elapsed_time <= max_time:
+                        # Aktualizuj wykres
+                        temp_plot.update_plot(elapsed_time, actual, expected)
+                        # Odśwież wykres
+                        temp_plot.canvas.draw()
+                        temp_plot.canvas.flush_events()
+                        # Wyświetl aktualną pozycję pionowej linii
+            except Exception as e:
+                print(f"Error updating plot: {e}")
+            # ==========================
+
+            # Zaktualizuj current_time na koniec pętli aktualizacji
+            current_time = current_pzem_time # Użyj zapisanego czasu dla dokładności interwału
+
+        # Odświeżenie GUI Tkinter
+        root.update_idletasks()
+        root.update()
+
+except KeyboardInterrupt:
+    triac_pin_set_zero()
+    print("Zatrzymano program przerwaniem.")
+finally:
+    file.close()
+    lgpio.gpiochip_close(h)

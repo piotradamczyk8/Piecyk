@@ -1,0 +1,61 @@
+{
+    "name": "Glazing",
+    "description": "Standard glaze firing curve",
+    "points": [
+        {
+            "time": "00:00",
+            "temperature": 30,
+            "stage": "Start of firing"
+        },
+        {
+            "time": "01:00",
+            "temperature": 200,
+            "stage": "Preheating"
+        },
+        {
+            "time": "02:00",
+            "temperature": 500,
+            "stage": "Water smoking"
+        },
+        {
+            "time": "03:00",
+            "temperature": 600,
+            "stage": "Organic matter burning"
+        },
+        {
+            "time": "04:00",
+            "temperature": 1050,
+            "stage": "Glaze firing"
+        },
+        {
+            "time": "04:15",
+            "temperature": 1050,
+            "stage": "Soaking"
+        },
+        {
+            "time": "05:00",
+            "temperature": 850,
+            "stage": "Cooling"
+        },
+        {
+            "time": "06:00",
+            "temperature": 600,
+            "stage": "Cooling"
+        },
+        {
+            "time": "07:00",
+            "temperature": 500,
+            "stage": "Cooling"
+        },
+        {
+            "time": "08:00",
+            "temperature": 200,
+            "stage": "Cooling"
+        },
+        {
+            "time": "09:00",
+            "temperature": 30,
+            "stage": "End of firing"
+        }
+    ]
+} 

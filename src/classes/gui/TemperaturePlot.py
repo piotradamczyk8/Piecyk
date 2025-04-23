@@ -8,17 +8,17 @@ class TemperaturePlot:
         self.fig = Figure(figsize=(6, 3), dpi=100)
         self.ax = self.fig.add_subplot(111)
 
-        self.ax.set_title("Przebieg Temperatury")
-        self.ax.set_xlabel("Czas (HH:MM)")
-        self.ax.set_ylabel("Temperatura (°C)")
+        self.ax.set_title("Temperature Profile")
+        self.ax.set_xlabel("Time (HH:MM)")
+        self.ax.set_ylabel("Temperature (°C)")
 
-        # Linie dla temperatury oczekiwanej i rzeczywistej
-        self.line_expected, = self.ax.plot([], [], 'r--', label='Oczekiwana')
-        self.line_actual, = self.ax.plot([], [], 'b-', label='Rzeczywista')
-        # Linia dla całego profilu zadanego
-        self.line_profile, = self.ax.plot([], [], 'g:', label='Profil Zadany')
-        # Pionowa linia aktualnego punktu
-        self.line_current = self.ax.axvline(x=0, color='r', linestyle='-', linewidth=2, label='Aktualny punkt', picker=5)
+        # Lines for expected and actual temperature
+        self.line_expected, = self.ax.plot([], [], 'r--', label='Expected')
+        self.line_actual, = self.ax.plot([], [], 'b-', label='Actual')
+        # Line for the entire profile
+        self.line_profile, = self.ax.plot([], [], 'g:', label='Profile')
+        # Vertical line for current point
+        self.line_current = self.ax.axvline(x=0, color='r', linestyle='-', linewidth=2, label='Current point', picker=5)
 
         # Ustawienie formatera osi X
         def time_formatter(x, pos):
@@ -145,7 +145,7 @@ class TemperaturePlot:
             self.line_current.remove()
             # Utwórz nową linię pionową
             self.line_current = self.ax.axvline(x=time_point, color='r', linestyle='-', linewidth=2, picker=5)
-            print(f"Updating current line: x={time_point}") # Debug
+            #print(f"Updating current line: x={time_point}") # Debug
 
         # Ustawienie limitów osi Y na podstawie profilu + margines
         if self.profile_temps:

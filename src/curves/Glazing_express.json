@@ -1,0 +1,26 @@
+{
+    "name": "Glazing_express",
+    "description": "Fast glaze firing curve",
+    "points": [
+        {
+            "time": "00:00",
+            "temperature": 30,
+            "stage": "Start of firing"
+        },
+        {
+            "time": "02:00",
+            "temperature": 1000,
+            "stage": "Fast preheating"
+        },
+        {
+            "time": "02:15",
+            "temperature": 1030,
+            "stage": "Glaze firing"
+        },
+        {
+            "time": "03:00",
+            "temperature": 30,
+            "stage": "End of firing"
+        }
+    ]
+} 

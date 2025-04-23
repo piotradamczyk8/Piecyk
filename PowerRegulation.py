@@ -11,10 +11,10 @@ import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
-from PZEM_004T import PZEM_004T
-from Thermocouple import Thermocouple
-from TemperatureApproximator import TemperatureApproximator
-from PIDController import PIDController
+from classes.PZEM_004T import PZEM_004T
+from classes.Thermocouple import Thermocouple
+from classes.TemperatureApproximator import TemperatureApproximator
+from classes.PIDController import PIDController, MAX_TIME_ON
 from src.classes.TemperatureCurves import TemperatureCurves
 from src.classes.LEDIndicator import LEDIndicator
 
@@ -697,14 +697,7 @@ def set_initial_time():
             actual = float(temperature_approximate_var.get())
             expected = float(temperature_expected_var.get())
             temp_plot.update_plot(elapsed_time, actual, expected)
-            
-            # Wyświetl informacje debugowe
-            #print(f"Profile times: {temp_plot.profile_times}")
-            #print(f"Profile temps: {temp_plot.profile_temps}")
-            #print(f"Start time: {start_time}")
-            #print(f"Add time: {add_time}")
-            #print(f"Elapsed time: {elapsed_time}")
-            
+           
             # Odśwież wykres
             temp_plot.canvas.draw()
             temp_plot.canvas.flush_events()
@@ -738,7 +731,7 @@ root.title("Kiln Control System")
 setup_gui() # Wywołaj nową funkcję konfiguracji GUI
 
 # Utworzenie pliku CSV - przeniesione po setup_gui()
-file = open(f"dane_{curve_var.get().lower()}_{time.strftime('%Y-%m-%d_%H%M')}.csv", mode="a", newline="", encoding="utf-8")
+file = open(f"dane_{curve_var.get().lower()}_{time.strftime('%Y-%m-%d_%H%M')}.csv", mode="a", newline="", encoding="utf-8") 
 
 try:
     # Główna pętla programu
@@ -746,41 +739,49 @@ try:
     current_time = start_time
     while True:
 
-        if on_delay > 0:
+        # Odczyty sensorów i obliczenia
+        try: 
+            update_temperature(thermocouple)
+        except Exception as e: print(f"Error updating temperature: {e}")
+
+        # Oblicz nowe sterowanie PID
+        try:
+            update_PID() 
+        except Exception as e: print(f"Error updating PID: {e}")
+
+        # Aktualizacja GUI i zapisu danych
+        try:
+            update_time() # Aktualizuje etykiety czasu i postępu
+        except Exception as e: print(f"Error updating time labels: {e}")
+
+        try:
+            expected_temp = get_expected_temperature()
+            temperature_expected_var.set(f"{expected_temp:.2f}")
+        except Exception as e: print(f"Error getting expected temperature: {e}")  
+ 
+
+        on_delay_sek = on_delay / 1000    
+        # Sterowanie triakiem
+        if on_delay_sek > 0:
+            try: 
+                update_pzem_data(pzem)
+            except Exception as e: print(f"Error updating PZEM data: {e}")     
             lgpio.gpio_write(h, TRIAC_PIN, 1)
             led_indicator.turn_on()
             root.update()
-            time.sleep(on_delay/1000)
+            time.sleep(on_delay_sek)
             lgpio.gpio_write(h, TRIAC_PIN, 0)
             led_indicator.turn_off()
             root.update()
-            time.sleep(1 - on_delay/1000) # Czy off_delay jest potrzebne? Zwykle steruje się tylko czasem włączenia
-        else:
-            time.sleep(1)
+            time.sleep(MAX_TIME_ON/1000 - on_delay_sek)
   
 
-        # Aktualizacja danych i wykresu co 0.5 sekundy
-        if time.time() - current_time >= 0.5:
+        # Aktualizacja danych i wykresu co 1 sekundę
+        if time.time() - current_time >= 1:
             elapsed_time = time.time() - start_time  # elapsed_time będzie już uwzględniał add_time
             current_pzem_time = time.time() # Zapisz czas przed odczytami
-
-            # Odczyty sensorów i obliczenia
-            try: update_temperature(thermocouple)
-            except Exception as e: print(f"Error updating temperature: {e}")
-            try: update_pzem_data(pzem)
-            except Exception as e: print(f"Error updating PZEM data: {e}")
-            try:
-                 expected_temp = get_expected_temperature()
-                 temperature_expected_var.set(f"{expected_temp:.2f}")
-            except Exception as e: print(f"Error getting expected temperature: {e}")
-            try: update_PID() # Oblicz nowe sterowanie PID
-            except Exception as e: print(f"Error updating PID: {e}")
-
-            # Aktualizacja GUI i zapisu danych
-            try: update_time() # Aktualizuje etykiety czasu i postępu
-            except Exception as e: print(f"Error updating time labels: {e}")
-
-             # === Aktualizacja wykresu ===
+            
+            # === Aktualizacja wykresu ===
             try:
                 if temp_plot: # Sprawdź czy wykres istnieje
                     # Użyj wartości ze zmiennych Tkinter lub bezpośrednio z obliczeń
@@ -801,10 +802,8 @@ try:
                 print(f"Error updating plot: {e}")
             # ==========================
 
-
             # Zaktualizuj current_time na koniec pętli aktualizacji
             current_time = current_pzem_time # Użyj zapisanego czasu dla dokładności interwału
-
 
         # Odświeżenie GUI Tkinter
         root.update_idletasks()

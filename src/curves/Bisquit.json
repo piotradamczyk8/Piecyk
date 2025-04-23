@@ -1,0 +1,61 @@
+{
+    "name": "Bisquit",
+    "description": "Standard bisque firing curve",
+    "points": [
+        {
+            "time": "00:00",
+            "temperature": 30,
+            "stage": "Start of firing"
+        },
+        {
+            "time": "03:00",
+            "temperature": 200,
+            "stage": "Preheating"
+        },
+        {
+            "time": "04:00",
+            "temperature": 400,
+            "stage": "Water smoking"
+        },
+        {
+            "time": "05:00",
+            "temperature": 500,
+            "stage": "Organic matter burning"
+        },
+        {
+            "time": "06:00",
+            "temperature": 600,
+            "stage": "Carbon burning"
+        },
+        {
+            "time": "07:00",
+            "temperature": 850,
+            "stage": "Bisque firing"
+        },
+        {
+            "time": "07:15",
+            "temperature": 850,
+            "stage": "Soaking"
+        },
+        {
+            "time": "08:00",
+            "temperature": 600,
+            "stage": "Cooling"
+        },
+        {
+            "time": "09:00",
+            "temperature": 500,
+            "stage": "Cooling"
+        },
+        {
+            "time": "10:00",
+            "temperature": 200,
+            "stage": "Cooling"
+        },
+        {
+            "time": "11:00",
+            "temperature": 30,
+            "stage": "End of firing"
+        }
+    ]
+} 

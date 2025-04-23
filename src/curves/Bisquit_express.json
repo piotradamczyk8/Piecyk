@@ -1,0 +1,46 @@
+{
+    "name": "Bisquit_express",
+    "description": "Szybka krzywa wypału biskwitu",
+    "points": [
+        {
+            "time": "00:00",
+            "temperature": 30,
+            "stage": "Początek wypału"
+        },
+        {
+            "time": "03:00",
+            "temperature": 500,
+            "stage": "Szybkie podgrzewanie"
+        },
+        {
+            "time": "04:00",
+            "temperature": 600,
+            "stage": "Wypalanie"
+        },
+        {
+            "time": "05:00",
+            "temperature": 850,
+            "stage": "Wypalanie biskwitu"
+        },
+        {
+            "time": "05:15",
+            "temperature": 850,
+            "stage": "Wygrzewanie"
+        },
+        {
+            "time": "06:00",
+            "temperature": 600,
+            "stage": "Schładzanie"
+        },
+        {
+            "time": "07:00",
+            "temperature": 500,
+            "stage": "Schładzanie"
+        },
+        {
+            "time": "08:00",
+            "temperature": 30,
+            "stage": "Koniec wypału"
+        }
+    ]
+} 

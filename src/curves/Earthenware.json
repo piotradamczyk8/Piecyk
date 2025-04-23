@@ -1,0 +1,71 @@
+{
+    "name": "Earthenware",
+    "description": "Krzywa wypału wyrobów kamionkowych (earthenware)",
+    "points": [
+        {
+            "time": "00:00",
+            "temperature": 30,
+            "stage": "Początek wypału"
+        },
+        {
+            "time": "01:00",
+            "temperature": 200,
+            "stage": "Podgrzewanie"
+        },
+        {
+            "time": "02:00",
+            "temperature": 500,
+            "stage": "Wypalanie wody"
+        },
+        {
+            "time": "03:00",
+            "temperature": 800,
+            "stage": "Wypalanie materii organicznej"
+        },
+        {
+            "time": "04:00",
+            "temperature": 1000,
+            "stage": "Wypalanie węgla"
+        },
+        {
+            "time": "05:00",
+            "temperature": 1100,
+            "stage": "Wypalanie kamionki"
+        },
+        {
+            "time": "05:30",
+            "temperature": 1100,
+            "stage": "Wygrzewanie"
+        },
+        {
+            "time": "06:00",
+            "temperature": 1000,
+            "stage": "Schładzanie"
+        },
+        {
+            "time": "07:00",
+            "temperature": 800,
+            "stage": "Schładzanie"
+        },
+        {
+            "time": "08:00",
+            "temperature": 600,
+            "stage": "Schładzanie"
+        },
+        {
+            "time": "09:00",
+            "temperature": 400,
+            "stage": "Schładzanie"
+        },
+        {
+            "time": "10:00",
+            "temperature": 200,
+            "stage": "Schładzanie"
+        },
+        {
+            "time": "11:00",
+            "temperature": 30,
+            "stage": "Koniec wypału"
+        }
+    ]
+} 

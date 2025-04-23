@@ -1,0 +1,71 @@
+{
+    "name": "Smoke",
+    "description": "Krzywa wypału Smoke",
+    "points": [
+        {
+            "time": "00:00",
+            "temperature": 30,
+            "stage": "Początek wypału"
+        },
+        {
+            "time": "00:15",
+            "temperature": 200,
+            "stage": "Podgrzewanie"
+        },
+        {
+            "time": "00:30",
+            "temperature": 500,
+            "stage": "Wypalanie wody"
+        },
+        {
+            "time": "00:45",
+            "temperature": 800,
+            "stage": "Wypalanie materii organicznej"
+        },
+        {
+            "time": "01:00",
+            "temperature": 1000,
+            "stage": "Wypalanie węgla"
+        },
+        {
+            "time": "01:15",
+            "temperature": 1200,
+            "stage": "Wypalanie szkliwa"
+        },
+        {
+            "time": "01:30",
+            "temperature": 1200,
+            "stage": "Wygrzewanie"
+        },
+        {
+            "time": "01:45",
+            "temperature": 1000,
+            "stage": "Schładzanie"
+        },
+        {
+            "time": "02:00",
+            "temperature": 800,
+            "stage": "Schładzanie"
+        },
+        {
+            "time": "02:15",
+            "temperature": 600,
+            "stage": "Schładzanie"
+        },
+        {
+            "time": "02:30",
+            "temperature": 400,
+            "stage": "Schładzanie"
+        },
+        {
+            "time": "02:45",
+            "temperature": 200,
+            "stage": "Schładzanie"
+        },
+        {
+            "time": "03:00",
+            "temperature": 30,
+            "stage": "Koniec wypału"
+        }
+    ]
+} 

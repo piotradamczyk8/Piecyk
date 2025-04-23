@@ -1,0 +1,71 @@
+{
+    "name": "Pit Fire",
+    "description": "Krzywa wypału Pit Fire",
+    "points": [
+        {
+            "time": "00:00",
+            "temperature": 30,
+            "stage": "Początek wypału"
+        },
+        {
+            "time": "00:30",
+            "temperature": 200,
+            "stage": "Podgrzewanie"
+        },
+        {
+            "time": "01:00",
+            "temperature": 500,
+            "stage": "Wypalanie wody"
+        },
+        {
+            "time": "01:30",
+            "temperature": 800,
+            "stage": "Wypalanie materii organicznej"
+        },
+        {
+            "time": "02:00",
+            "temperature": 1000,
+            "stage": "Wypalanie węgla"
+        },
+        {
+            "time": "02:30",
+            "temperature": 1200,
+            "stage": "Wypalanie szkliwa"
+        },
+        {
+            "time": "03:00",
+            "temperature": 1200,
+            "stage": "Wygrzewanie"
+        },
+        {
+            "time": "03:30",
+            "temperature": 1000,
+            "stage": "Schładzanie"
+        },
+        {
+            "time": "04:00",
+            "temperature": 800,
+            "stage": "Schładzanie"
+        },
+        {
+            "time": "04:30",
+            "temperature": 600,
+            "stage": "Schładzanie"
+        },
+        {
+            "time": "05:00",
+            "temperature": 400,
+            "stage": "Schładzanie"
+        },
+        {
+            "time": "05:30",
+            "temperature": 200,
+            "stage": "Schładzanie"
+        },
+        {
+            "time": "06:00",
+            "temperature": 30,
+            "stage": "Koniec wypału"
+        }
+    ]
+} 

@@ -1,0 +1,66 @@
+{
+    "name": "Glazing_perfect",
+    "description": "Idealna krzywa wypału szkliwa",
+    "points": [
+        {
+            "time": "00:00",
+            "temperature": 30,
+            "stage": "Początek wypału"
+        },
+        {
+            "time": "01:00",
+            "temperature": 200,
+            "stage": "Podgrzewanie"
+        },
+        {
+            "time": "02:00",
+            "temperature": 500,
+            "stage": "Wypalanie wody"
+        },
+        {
+            "time": "03:00",
+            "temperature": 600,
+            "stage": "Wypalanie materii organicznej"
+        },
+        {
+            "time": "04:00",
+            "temperature": 750,
+            "stage": "Wypalanie węgla"
+        },
+        {
+            "time": "05:00",
+            "temperature": 900,
+            "stage": "Wypalanie szkliwa"
+        },
+        {
+            "time": "06:00",
+            "temperature": 1050,
+            "stage": "Wypalanie szkliwa"
+        },
+        {
+            "time": "06:15",
+            "temperature": 1050,
+            "stage": "Wygrzewanie"
+        },
+        {
+            "time": "07:00",
+            "temperature": 850,
+            "stage": "Schładzanie"
+        },
+        {
+            "time": "08:00",
+            "temperature": 600,
+            "stage": "Schładzanie"
+        },
+        {
+            "time": "09:00",
+            "temperature": 500,
+            "stage": "Schładzanie"
+        },
+        {
+            "time": "10:00",
+            "temperature": 30,
+            "stage": "Koniec wypału"
+        }
+    ]
+} 

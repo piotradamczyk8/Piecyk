@@ -1,0 +1,76 @@
+{
+    "name": "Stoneware",
+    "description": "Stoneware firing curve",
+    "points": [
+        {
+            "time": "00:00",
+            "temperature": 30,
+            "stage": "Start of firing"
+        },
+        {
+            "time": "02:00",
+            "temperature": 200,
+            "stage": "Preheating"
+        },
+        {
+            "time": "03:00",
+            "temperature": 300,
+            "stage": "Water smoking"
+        },
+        {
+            "time": "04:00",
+            "temperature": 400,
+            "stage": "Organic matter burning"
+        },
+        {
+            "time": "05:00",
+            "temperature": 500,
+            "stage": "Carbon burning"
+        },
+        {
+            "time": "06:00",
+            "temperature": 600,
+            "stage": "Stoneware firing"
+        },
+        {
+            "time": "07:00",
+            "temperature": 700,
+            "stage": "Stoneware firing"
+        },
+        {
+            "time": "08:00",
+            "temperature": 800,
+            "stage": "Stoneware firing"
+        },
+        {
+            "time": "09:00",
+            "temperature": 900,
+            "stage": "Stoneware firing"
+        },
+        {
+            "time": "10:00",
+            "temperature": 1000,
+            "stage": "Stoneware firing"
+        },
+        {
+            "time": "11:00",
+            "temperature": 1100,
+            "stage": "Stoneware firing"
+        },
+        {
+            "time": "12:00",
+            "temperature": 1200,
+            "stage": "Stoneware firing"
+        },
+        {
+            "time": "13:00",
+            "temperature": 1250,
+            "stage": "Soaking"
+        },
+        {
+            "time": "14:00",
+            "temperature": 30,
+            "stage": "End of firing"
+        }
+    ]
+} 
