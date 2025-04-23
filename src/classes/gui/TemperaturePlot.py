@@ -2,6 +2,7 @@ import tkinter as tk
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+import time
 
 class TemperaturePlot:
     def __init__(self, parent_frame):
@@ -129,40 +130,37 @@ class TemperaturePlot:
         
         print(f"Ustawiono czas z linii: {xdata} sekund ({hours:02}:{minutes:02})")
 
-    def update_plot(self, time_point, actual_temp, expected_temp):
-        """Dodaje nowy punkt danych i aktualizuje wykres."""
-        self.time_data.append(time_point)
-        self.temp_actual_data.append(float(actual_temp))
-        self.temp_expected_data.append(float(expected_temp))
-
-        # Aktualizacja danych linii
-        self.line_actual.set_data(self.time_data, self.temp_actual_data)
-        self.line_expected.set_data(self.time_data, self.temp_expected_data)
-        
-        # Aktualizacja pionowej linii aktualnego punktu
-        if self.profile_times:
-            # Usuń starą linię pionową
-            self.line_current.remove()
-            # Utwórz nową linię pionową
-            self.line_current = self.ax.axvline(x=time_point, color='r', linestyle='-', linewidth=2, picker=5)
-
-        # Ustawienie limitów osi Y na podstawie profilu + margines
-        if self.profile_temps:
-            min_temp = min(self.profile_temps)
-            max_temp = max(self.profile_temps)
-            margin = (max_temp - min_temp) * 0.1
-            self.ax.set_ylim(bottom=min_temp - margin, top=max_temp + margin)
-
-        # Ustawienie limitów osi X na podstawie profilu zadanego
-        if self.profile_times:
-            self.ax.set_xlim(left=0, right=max(self.profile_times) * 1.05)
-
-        # Odświeżenie wykresu
-        self.canvas.draw()
-        self.canvas.flush_events()
-        self.fig.canvas.draw_idle()
-        self.canvas_widget.update_idletasks()
-        self.canvas_widget.update()
+    def update_plot(self, elapsed_time, actual_temp, expected_temp):
+        """Aktualizuje wykres z nowymi danymi."""
+        try:
+            # Konwertuj wartości na float
+            elapsed_time = float(elapsed_time)
+            actual_temp = float(actual_temp)
+            expected_temp = float(expected_temp)
+            
+            # Dodaj nowe dane
+            self.time_data.append(elapsed_time)
+            self.temp_actual_data.append(actual_temp)
+            self.temp_expected_data.append(expected_temp)
+            
+            # Aktualizuj linie wykresu
+            self.line_actual.set_data(self.time_data, self.temp_actual_data)
+            self.line_expected.set_data(self.time_data, self.temp_expected_data)
+            
+            # Aktualizuj pionową linię czasu
+            self.line_current.set_data([elapsed_time, elapsed_time], 
+                                     [0, max(max(self.temp_actual_data), max(self.temp_expected_data))])
+            
+            # Dostosuj zakres osi
+            self.ax.relim()
+            self.ax.autoscale_view()
+            
+            # Odśwież wykres
+            self.canvas.draw()
+            self.canvas.flush_events()
+            
+        except Exception as e:
+            print(f"Błąd przy aktualizacji wykresu: {e}")
 
     def draw_expected_profile(self, schedule):
         """Rysuje cały oczekiwany profil temperatury na podstawie harmonogramu."""

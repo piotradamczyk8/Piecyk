@@ -3,34 +3,29 @@ from src.classes.Config import Config
 
 class SSR:
     def __init__(self):
-        """Inicjalizacja sterowania przekaźnikiem półprzewodnikowym."""
+        """Inicjalizacja SSR."""
         self.config = Config()
-        self.ssr_pin = self.config.get_gpio_pin("TRIAC_PIN")
+        self.pin = self.config.get_gpio_pin("SSR_PIN")
         self.h = None
-        self._open_gpio()
-
-    def _open_gpio(self):
-        """Otwiera połączenie GPIO jeśli nie jest otwarte."""
-        if self.h is None:
-            try:
-                self.h = lgpio.gpiochip_open(0)
-                lgpio.gpio_claim_output(self.h, self.ssr_pin)
-            except Exception as e:
-                print(f"Błąd przy otwieraniu GPIO: {e}")
-                self.h = None
 
     def on(self):
         """Włącza SSR."""
         if self.h is None:
-            self._open_gpio()
+            try:
+                self.h = lgpio.gpiochip_open(0)
+                lgpio.gpio_claim_output(self.h, self.pin)
+            except Exception as e:
+                print(f"Błąd przy otwieraniu GPIO: {e}")
+                self.h = None
+                return
         if self.h is not None:
-            lgpio.gpio_write(self.h, self.ssr_pin, 1)
+            lgpio.gpio_write(self.h, self.pin, 1)
 
     def off(self):
         """Wyłącza SSR."""
         if self.h is not None:
             try:
-                lgpio.gpio_write(self.h, self.ssr_pin, 0)
+                lgpio.gpio_write(self.h, self.pin, 0)
                 lgpio.gpiochip_close(self.h)
             except Exception as e:
                 print(f"Błąd przy zamykaniu GPIO: {e}")

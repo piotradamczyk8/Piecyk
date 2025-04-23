@@ -42,6 +42,7 @@ class GUISetup:
         self.initial_time_var: Optional[tk.StringVar] = None
         self.progress_bar: Optional[ttk.Progressbar] = None
         self.led_indicator = None
+        self.spinbox_temperature_ir = None
 
         # Inicjalizacja TemperatureCurves
         self.temperature_curves = TemperatureCurves()
@@ -127,9 +128,9 @@ class GUISetup:
         ir_frame = tk.Frame(controls_frame)
         ir_frame.pack(pady=5)
         tk.Label(ir_frame, text="Corrective temperature IR (°C):").pack(side=tk.LEFT, padx=5)
-        self.spinbox_temperature_ir_var = tk.Spinbox(ir_frame, from_=-1000, to=1000, increment=1, 
+        self.spinbox_temperature_ir = tk.Spinbox(ir_frame, from_=-1000, to=1000, increment=1, 
                                               textvariable=self.temperature_ir_var, width=5)
-        self.spinbox_temperature_ir_var.pack(side=tk.LEFT, padx=5)
+        self.spinbox_temperature_ir.pack(side=tk.LEFT, padx=5)
         tk.Button(ir_frame, text="SET", command=set_temperature_ir).pack(side=tk.LEFT, padx=5)
 
         # FINISH button at the bottom of controls frame
@@ -144,8 +145,8 @@ class GUISetup:
         self.led_indicator = LEDIndicator(plot_frame)
         self.led_indicator.place(relx=0.95, rely=0.05, anchor="ne")
         self.led_indicator.configure(bg="white")
-        self.led_indicator.configure(width=20)
-        self.led_indicator.configure(height=20)
+        self.led_indicator.configure(width=2)
+        self.led_indicator.configure(height=2)
 
     def get_initial_time_var(self) -> Optional[tk.StringVar]:
         """Zwraca zmienną przechowującą początkowy czas."""
@@ -165,4 +166,8 @@ class GUISetup:
 
     def get_curve_description_var(self) -> tk.StringVar:
         """Zwraca zmienną przechowującą opis krzywej."""
-        return self.curve_description_var 
+        return self.curve_description_var
+
+    def get_spinbox_temperature_ir(self):
+        """Zwraca referencję do spinboxa temperatury IR."""
+        return self.spinbox_temperature_ir 

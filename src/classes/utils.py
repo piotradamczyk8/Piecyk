@@ -16,14 +16,14 @@ def seconds_to_time(seconds: int) -> str:
     minutes = (seconds % 3600) // 60
     return f"{hours:02}:{minutes:02}"
 
-def setup_gpio() -> int:
-    """Inicjalizuje GPIO."""
-    config = Config()
-    
-    h = lgpio.gpiochip_open(0)
-    lgpio.gpio_claim_output(h, config.get_gpio_pin('TRIAC_PIN'))
-    lgpio.gpio_write(h, config.get_gpio_pin('TRIAC_PIN'), 0)
-    return h
+def setup_gpio():
+    """Inicjalizacja GPIO."""
+    try:
+        h = lgpio.gpiochip_open(0)
+        return h
+    except Exception as e:
+        print(f"Błąd przy otwieraniu GPIO: {e}")
+        return None
 
 def stop_program(h: int, ssr: Any, root: Any, file_handle: Any = None) -> None:
     """Zatrzymuje program i zamyka wszystkie zasoby."""
