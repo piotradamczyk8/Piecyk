@@ -10,6 +10,28 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+import os
+import sys
+import matplotlib
+# Ustawienie backendu matplotlib na Agg, który nie wymaga wyświetlacza
+matplotlib.use('Agg')
+
+# Sprawdzenie czy jest dostępny wyświetlacz X11
+if os.environ.get('DISPLAY') is None:
+    os.environ['DISPLAY'] = ':0'
+
+try:
+    root = tk.Tk()
+except tk.TclError as e:
+    print(f"Błąd inicjalizacji Tkinter: {e}")
+    print("Próba uruchomienia w trybie bez wyświetlacza...")
+    # Ustawienie zmiennej środowiskowej dla headless mode
+    os.environ['DISPLAY'] = ':0'
+    try:
+        root = tk.Tk()
+    except tk.TclError as e:
+        print("Nie można zainicjalizować Tkinter. Zamykanie programu.")
+        sys.exit(1)
 
 from src.classes.devices.PZEM_004T import PZEM_004T
 from src.classes.devices.Thermocouple import Thermocouple
@@ -21,13 +43,12 @@ from src.classes.gui.TemperaturePlot import TemperaturePlot
 from src.classes.gui.GUISetup import GUISetup
 from src.classes.Config import Config
 from src.classes.gui.PowerControl import PowerControl
+from src.classes.devices.SSR import SSR
 
 ################################################
 # Stałe
 ##############################################
 config = Config()
-ZERO_CROSS_PIN = config.get_gpio_pin('ZERO_CROSS_PIN')
-TRIAC_PIN = config.get_gpio_pin('TRIAC_PIN')
 FREQ = config.get_power_value('FREQ')
 HALF_CYCLE = config.get_power_value('HALF_CYCLE')
 POWER = config.get_power_value('POWER')
@@ -48,7 +69,6 @@ def seconds_to_time(seconds):
 ##############################################
 # Zmienne globalne
 ##############################################
-root = tk.Tk()
 curve_var = tk.StringVar(value=config.get_gui_value('DEFAULT_CURVE')) # Domyślna wartość z config
 temp_plot = None # Globalna zmienna dla obiektu wykresu
 progress_var = tk.DoubleVar(value=0) # Zmienna dla paska postępu
@@ -98,22 +118,16 @@ led_indicator = LEDIndicator(root)
 def setup_gpio():
     global h
     h = lgpio.gpiochip_open(0)
-    lgpio.gpio_claim_input(h, ZERO_CROSS_PIN)
-    lgpio.gpio_claim_output(h, TRIAC_PIN)
-    lgpio.gpio_write(h, TRIAC_PIN, 0)
+    lgpio.gpio_claim_output(h, SSR_PIN)
+    lgpio.gpio_write(h, SSR_PIN, 0)
 
 def stop_program():
     try:
-        triac_pin_set_zero()
-        lgpio.gpiochip_close(h)
+        ssr.off()  # Używamy metody off() z klasy SSR
+        print("Zatrzymano program przyciskiem")
+        root.quit()
     except Exception as e:
-        print(f"Błąd przy zamykaniu GPIO: {e}")
-    print("Zatrzymano program przyciskiem")
-    root.quit()  # Zamiast exit(0) używamy root.quit()
-
-def triac_pin_set_zero():
-    lgpio.gpio_claim_output(h, TRIAC_PIN)
-    lgpio.gpio_write(h, TRIAC_PIN, 0)  
+        print(f"Błąd przy zamykaniu programu: {e}")
 
 def regulation_desk():        
     root.geometry(f"{config.get_gui_value('WINDOW_WIDTH')}x{config.get_gui_value('WINDOW_HEIGHT')}")
@@ -166,16 +180,26 @@ def update_time():
     print(f"Elapsed time: {hours:02}:{minutes:02}:{seconds:02}")
 
     # Oblicz pozostały czas na podstawie harmonogramu
-    total_schedule_time = max(temperature_schedule.keys()) * 3600
-    remaining_time = max(0, total_schedule_time - elapsed_time)
+    if temperature_schedule and 'points' in temperature_schedule:
+        # Znajdź maksymalny czas w harmonogramie
+        max_time = 0
+        for point in temperature_schedule['points']:
+            time_str = point['time']
+            hours, minutes = map(int, time_str.split(':'))
+            seconds = hours * 3600 + minutes * 60
+            max_time = max(max_time, seconds)
+            
+        remaining_time = max(0, max_time - elapsed_time)
+    else:
+        remaining_time = 0
     
     hours, remainder = divmod(int(remaining_time), 3600)
     minutes, seconds = divmod(remainder, 60)
     remaining_time_var.set(f"{hours:02}:{minutes:02}:{seconds:02}") 
 
     # Oblicz postęp
-    if total_schedule_time > 0:
-        progress = (elapsed_time / total_schedule_time) * 100
+    if max_time > 0:
+        progress = (elapsed_time / max_time) * 100
         progress_var.set(progress)  # Aktualizuj wartość paska postępu
         if progress_bar:  # Sprawdź czy progress_bar istnieje
             progress_bar.update()  # Wymuś odświeżenie paska postępu
@@ -385,9 +409,6 @@ def set_initial_time():
 # PROGRAM GŁÓWNY
 #############################
 
-# Inicjalizacja GPIO
-setup_gpio()
-
 # Inicjalizacja PZEM-004T
 pzem = PZEM_004T()
 
@@ -397,12 +418,18 @@ i2c = busio.I2C(board.SCL, board.SDA)
 # Inicjalizacja termopary
 thermocouple = Thermocouple()
 
+# Inicjalizacja SSR
+ssr = SSR()
+
 # Inicjalizacja GUI i wykresu
 root.geometry(f"{config.get_gui_value('WINDOW_WIDTH')}x{config.get_gui_value('WINDOW_HEIGHT')}")
 root.title("Kiln Control System")
-setup_gui() # Wywołaj nową funkcję konfiguracji GUI
+setup_gui()
 
-# Utworzenie pliku CSV - przeniesione po setup_gui()
+# Inicjalizacja harmonogramu temperatury
+set_temperature_schedule(curve_var)
+
+# Utworzenie pliku CSV
 file = open(f"dane_{curve_var.get().lower()}_{time.strftime('%Y-%m-%d_%H%M')}.csv", 
            mode="a", 
            newline=config.get_csv_value('NEWLINE'), 
@@ -441,11 +468,11 @@ try:
             try: 
                 update_pzem_data(pzem)
             except Exception as e: print(f"Error updating PZEM data: {e}")     
-            lgpio.gpio_write(h, TRIAC_PIN, 1)
+            ssr.on()
             led_indicator.turn_on()
             root.update()
             time.sleep(on_delay_sek)
-            lgpio.gpio_write(h, TRIAC_PIN, 0)
+            ssr.off()
             led_indicator.turn_off()
             root.update()
             time.sleep(MAX_TIME_ON/1000 - on_delay_sek)
@@ -485,8 +512,8 @@ try:
         root.update()
 
 except KeyboardInterrupt:
-    triac_pin_set_zero()
+    ssr.off()
     print("Zatrzymano program przerwaniem.")
 finally:
     file.close()
-    lgpio.gpiochip_close(h)
+    del ssr  # Wywoła destruktor, który zamknie GPIO

@@ -131,6 +131,14 @@ class TemperaturePlot:
 
     def update_plot(self, time_point, actual_temp, expected_temp):
         """Dodaje nowy punkt danych i aktualizuje wykres."""
+        # Konwersja wartości na float
+        try:
+            actual_temp = float(actual_temp)
+            expected_temp = float(expected_temp)
+        except (ValueError, TypeError):
+            print("Błąd konwersji wartości temperatury na float")
+            return
+
         self.time_data.append(time_point)
         self.temp_actual_data.append(actual_temp)
         self.temp_expected_data.append(expected_temp)
@@ -145,7 +153,6 @@ class TemperaturePlot:
             self.line_current.remove()
             # Utwórz nową linię pionową
             self.line_current = self.ax.axvline(x=time_point, color='r', linestyle='-', linewidth=2, picker=5)
-            #print(f"Updating current line: x={time_point}") # Debug
 
         # Ustawienie limitów osi Y na podstawie profilu + margines
         if self.profile_temps:
@@ -167,10 +174,21 @@ class TemperaturePlot:
 
     def draw_expected_profile(self, schedule):
         """Rysuje cały oczekiwany profil temperatury na podstawie harmonogramu."""
+        # Sprawdź czy schedule zawiera klucz 'points'
+        if not isinstance(schedule, dict) or 'points' not in schedule:
+            print("Nieprawidłowy format harmonogramu")
+            return
+        
         # Konwersja godzin na sekundy
-        schedule_seconds = {k * 3600: v for k, v in schedule.items()}
+        schedule_seconds = {}
+        for point in schedule['points']:
+            time_str = point['time']
+            hours, minutes = map(int, time_str.split(':'))
+            seconds = hours * 3600 + minutes * 60
+            schedule_seconds[seconds] = point['temperature']
+        
         self.profile_times = sorted(schedule_seconds.keys())
-        self.profile_temps = [schedule_seconds[t] for t in self.profile_times]
+        self.profile_temps = [float(schedule_seconds[t]) for t in self.profile_times]
 
         # Ustawienie danych dla linii profilu
         self.line_profile.set_data(self.profile_times, self.profile_temps)
