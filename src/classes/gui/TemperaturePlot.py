@@ -131,17 +131,9 @@ class TemperaturePlot:
 
     def update_plot(self, time_point, actual_temp, expected_temp):
         """Dodaje nowy punkt danych i aktualizuje wykres."""
-        # Konwersja wartości na float
-        try:
-            actual_temp = float(actual_temp)
-            expected_temp = float(expected_temp)
-        except (ValueError, TypeError):
-            print("Błąd konwersji wartości temperatury na float")
-            return
-
         self.time_data.append(time_point)
-        self.temp_actual_data.append(actual_temp)
-        self.temp_expected_data.append(expected_temp)
+        self.temp_actual_data.append(float(actual_temp))
+        self.temp_expected_data.append(float(expected_temp))
 
         # Aktualizacja danych linii
         self.line_actual.set_data(self.time_data, self.temp_actual_data)
@@ -185,19 +177,28 @@ class TemperaturePlot:
             time_str = point['time']
             hours, minutes = map(int, time_str.split(':'))
             seconds = hours * 3600 + minutes * 60
-            schedule_seconds[seconds] = point['temperature']
+            try:
+                schedule_seconds[seconds] = float(point['temperature'])
+            except (ValueError, TypeError):
+                print(f"Błąd konwersji temperatury na float: {point['temperature']}")
+                continue
         
+        if not schedule_seconds:
+            print("Brak prawidłowych punktów w harmonogramie")
+            return
+            
         self.profile_times = sorted(schedule_seconds.keys())
-        self.profile_temps = [float(schedule_seconds[t]) for t in self.profile_times]
+        self.profile_temps = [schedule_seconds[t] for t in self.profile_times]
 
         # Ustawienie danych dla linii profilu
         self.line_profile.set_data(self.profile_times, self.profile_temps)
 
         # Ustawienie limitów osi Y na podstawie profilu + margines
-        min_temp = min(self.profile_temps)
-        max_temp = max(self.profile_temps)
-        margin = (max_temp - min_temp) * 0.1
-        self.ax.set_ylim(bottom=min_temp - margin, top=max_temp + margin)
+        if self.profile_temps:
+            min_temp = min(self.profile_temps)
+            max_temp = max(self.profile_temps)
+            margin = (max_temp - min_temp) * 0.1
+            self.ax.set_ylim(bottom=min_temp - margin, top=max_temp + margin)
 
         # Ustawienie limitu osi X na podstawie maksymalnego czasu profilu
         if self.profile_times:
