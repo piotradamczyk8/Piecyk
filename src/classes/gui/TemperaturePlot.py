@@ -169,6 +169,12 @@ class TemperaturePlot:
     def update_plot(self, elapsed_time, actual_temp):
         """Aktualizuje wykres z nowymi danymi."""
         try:
+            current_time = time.time()
+            if current_time - self.last_draw_time < 1:  # minimalny odstęp 1 sekundę
+                return
+                
+            self.last_draw_time = current_time
+            
             # Dodaj nowe dane
             self.time_data.append(elapsed_time)
             self.temp_actual_data.append(actual_temp)
