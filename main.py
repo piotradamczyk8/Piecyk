@@ -236,11 +236,13 @@ try:
                 if state.temp_plot:
                     actual = float(state.temperature_approximate_var.get())
                     expected = float(state.temperature_expected_var.get())
-                    max_time = max(state.temperature_schedule.keys()) * 3600
-                    if state.elapsed_time <= max_time:
-                        state.temp_plot.update_plot(state.elapsed_time, actual, expected)
-                        state.temp_plot.canvas.draw()
-                        state.temp_plot.canvas.flush_events()
+                    if state.temperature_schedule and 'points' in state.temperature_schedule:
+                        # Znajdź maksymalny czas w harmonogramie
+                        max_time = max(time_to_seconds(point['time']) for point in state.temperature_schedule['points'])
+                        if state.elapsed_time <= max_time:
+                            state.temp_plot.update_plot(state.elapsed_time, actual, expected)
+                            state.temp_plot.canvas.draw()
+                            state.temp_plot.canvas.flush_events()
             except Exception as e:
                 print(f"Error updating plot: {e}")
 
