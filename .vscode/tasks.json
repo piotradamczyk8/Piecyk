@@ -18,10 +18,25 @@
             "command": "ssh",
             "args": [
                 "-X",
-                "piotradamczyk@192.168.0.234",
+                "rpi",
                 "/usr/bin/python3 ${file}"
             ],
             "problemMatcher": []
+        },
+        {
+            "label": "Run Piecyk",
+            "type": "shell",
+            "command": "ssh",
+            "args": [
+                "-X",
+                "rpi",
+                "/usr/bin/python3 /home/piotradamczyk/Projects/Piecyk/main.py"
+            ],
+            "problemMatcher": [],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
         }
     ]
 }

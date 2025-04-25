@@ -62,7 +62,6 @@ class GUIController:
                 self.state.temp_plot.temp_actual_data = []
                 self.state.temp_plot.temp_expected_data = []
                 self.state.temp_plot.line_actual.set_data([], [])
-                self.state.temp_plot.line_expected.set_data([], [])
                 
                 # Narysuj nowy profil
                 self.state.temp_plot.draw_expected_profile(self.state.temperature_schedule)

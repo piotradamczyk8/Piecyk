@@ -17,11 +17,5 @@ class PIDController:
         self.pid.output_limits = (0, self.max_time_on)
 
     def compute_power(self, current_temperature):
-        """
-        Oblicza wartość mocy na podstawie aktualnej temperatury.
-
-        :param current_temperature: Aktualna temperatura pieca (°C)
-        :return: Wartość mocy (0-1000)
-        """
         return self.pid(current_temperature)
  

@@ -13,8 +13,7 @@ class TemperaturePlot:
         self.ax.set_xlabel("Time (HH:MM)")
         self.ax.set_ylabel("Temperature (°C)")
 
-        # Lines for expected and actual temperature
-        self.line_expected, = self.ax.plot([], [], 'r--', label='Expected')
+        # Lines for expected and actual temperature        
         self.line_actual, = self.ax.plot([], [], 'b-', label='Actual')
         # Line for the entire profile
         self.line_profile, = self.ax.plot([], [], 'g:', label='Profile')
