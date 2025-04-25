@@ -149,40 +149,15 @@ class TemperaturePlot:
     def update_plot(self, elapsed_time, actual_temp):
         """Aktualizuje wykres z nowymi danymi."""
         try:
-            current_time = time.time()
-            
-            # Konwertuj wartości na float
-            elapsed_time = float(elapsed_time)
-            actual_temp = float(actual_temp)
-            
             # Dodaj nowe dane
             self.time_data.append(elapsed_time)
             self.temp_actual_data.append(actual_temp)
-            
-            # Ogranicz liczbę punktów
-            if len(self.time_data) > self.max_points:
-                self.time_data = self.time_data[-self.max_points:]
-                self.temp_actual_data = self.temp_actual_data[-self.max_points:]
-            
-            # Aktualizuj linie wykresu
-            self.line_actual.set_data(self.time_data, self.temp_actual_data)
+            self.ax.plot(self.time_data, self.temp_actual_data)
             
             # Aktualizuj pionową linię czasu
-            if self.temp_actual_data:  # Sprawdź czy lista nie jest pusta
-                max_temp = max(self.temp_actual_data)
-                self.line_current.set_data([elapsed_time, elapsed_time], [0, max_temp])
-            
-            # Przeskaluj wykres tylko co określony interwał
-            if current_time - self.last_scale_time >= self.scale_interval:
-                self.ax.relim()
-                self.ax.autoscale_view()
-                self.last_scale_time = current_time
-            
-            # Rysuj wykres tylko co określony interwał
-            if current_time - self.last_draw_time >= self.draw_interval:
-                self.canvas.draw()
-                self.last_draw_time = current_time
-            
+            max_temp = max(self.temp_actual_data)
+            self.line_current.set_data([elapsed_time, elapsed_time], [0, max_temp])
+          
         except Exception as e:
             print(f"Błąd przy aktualizacji wykresu: {e}")
 

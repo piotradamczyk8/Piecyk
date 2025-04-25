@@ -54,8 +54,8 @@ class GUISetup:
         controls_frame.pack(pady=(10, 0), fill=tk.X)
 
         # === GUI elements moved to controls_frame ===
-        # Pobierz dostępne krzywe z TemperatureCurves
-        available_curves = self.temperature_curves.get_curves()
+        # Pobierz dostępne krzywe z TemperatureCurves i usuń puste wartości
+        available_curves = [curve for curve in self.temperature_curves.get_curves() if curve.strip()]
         
         # Utwórz menu wyboru krzywej
         curve_option_menu = tk.OptionMenu(controls_frame, self.curve_var, *available_curves,
