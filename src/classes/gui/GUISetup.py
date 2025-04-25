@@ -36,10 +36,10 @@ class GUISetup:
         self.humidity = humidity
         self.progres_var_percent = progres_var_percent
         self.curve_description_var = tk.StringVar(master=self.root, value=curve_description)
+        self.initial_time_var = tk.StringVar(master=self.root, value="00:00")
 
         self.frame: Optional[tk.Frame] = None
         self.temp_plot = None
-        self.initial_time_var: Optional[tk.StringVar] = None
         self.progress_bar: Optional[ttk.Progressbar] = None
         self.led_indicator = None
         self.spinbox_temperature_ir = None
@@ -73,11 +73,44 @@ class GUISetup:
         # Frame for initial time
         initial_time_frame = tk.Frame(controls_frame)
         initial_time_frame.pack(pady=5)
-        tk.Label(initial_time_frame, text="Initial time (HH:MM):").pack(side=tk.LEFT, padx=5)
-        self.initial_time_var = tk.StringVar(value="01:00")
-        initial_time_entry = tk.Entry(initial_time_frame, textvariable=self.initial_time_var, width=5)
-        initial_time_entry.pack(side=tk.LEFT, padx=5)
-        tk.Button(initial_time_frame, text="SET", command=set_initial_time).pack(side=tk.LEFT, padx=5)
+        
+        tk.Label(initial_time_frame, text="Initial Time:").pack(side=tk.LEFT)
+        
+        # Spinbox dla godzin
+        self.hours_var = tk.StringVar(value="00")
+        self.hours_spinbox = tk.Spinbox(
+            initial_time_frame,
+            from_=0,
+            to=23,
+            width=2,
+            format="%02.0f",
+            textvariable=self.hours_var,
+            command=lambda: self.update_time(set_initial_time)
+        )
+        self.hours_spinbox.pack(side=tk.LEFT, padx=2)
+        
+        tk.Label(initial_time_frame, text=":").pack(side=tk.LEFT)
+        
+        # Spinbox dla minut
+        self.minutes_var = tk.StringVar(value="00")
+        self.minutes_spinbox = tk.Spinbox(
+            initial_time_frame,
+            from_=0,
+            to=59,
+            width=2,
+            format="%02.0f",
+            textvariable=self.minutes_var,
+            command=lambda: self.update_time(set_initial_time)
+        )
+        self.minutes_spinbox.pack(side=tk.LEFT, padx=2)
+        
+        # Przycisk do resetowania czasu
+        self.reset_button = tk.Button(
+            initial_time_frame,
+            text="Reset",
+            command=lambda: self.reset_time(set_initial_time)
+        )
+        self.reset_button.pack(side=tk.LEFT, padx=5)
 
         # Frame for curve description
         description_frame = tk.Frame(controls_frame)
@@ -177,3 +210,46 @@ class GUISetup:
     def get_spinbox_temperature_ir(self):
         """Zwraca referencję do spinboxa temperatury IR."""
         return self.spinbox_temperature_ir 
+
+    def update_time(self, set_initial_time):
+        """Aktualizuje czas na podstawie wartości z kontrolek."""
+        try:
+            hours = int(self.hours_var.get())
+            minutes = int(self.minutes_var.get())
+            
+            # Sprawdź poprawność wartości
+            if not (0 <= hours <= 23 and 0 <= minutes <= 59):
+                raise ValueError("Nieprawidłowa wartość czasu")
+            
+            # Utwórz string czasu w formacie HH:MM
+            time_str = f"{hours:02d}:{minutes:02d}"
+            
+            print(f"Ustawiono czas z kontrolek: {time_str}")
+            
+            # Aktualizuj zmienne czasu
+            self.initial_time_var.set(time_str)
+            
+            # Wywołaj set_initial_time
+            set_initial_time()
+            
+        except Exception as e:
+            print(f"Błąd przy aktualizacji czasu: {e}")
+            
+    def reset_time(self, set_initial_time):
+        """Resetuje czas do 00:00."""
+        self.hours_var.set("00")
+        self.minutes_var.set("00")
+        self.initial_time_var.set("00:00")
+        set_initial_time()
+            
+    def update_time_from_seconds(self, seconds):
+        """Aktualizuje kontrolki czasu na podstawie wartości w sekundach."""
+        try:
+            hours = int(seconds // 3600)
+            minutes = int((seconds % 3600) // 60)
+            
+            self.hours_var.set(f"{hours:02d}")
+            self.minutes_var.set(f"{minutes:02d}")
+            
+        except Exception as e:
+            print(f"Błąd przy aktualizacji czasu: {e}") 
