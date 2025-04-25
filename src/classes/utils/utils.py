@@ -199,20 +199,19 @@ def update_time(elapsed_time: float, temperature_schedule: Dict[str, Any],
     progres_var_percent.set(f"{progress:.2f}%")
     
     # Aktualizuj opis krzywej temperatury
-    if hasattr(state, 'temperature_curves') and hasattr(state, 'curve_var'):
-        curve_description = state.temperature_curves.get_curve_stage(state.curve_var.get(), time_str)
-        if hasattr(state, 'curve_description_var'):
-            state.curve_description_var.set(curve_description)
+    curve_description = state.temperature_curves.get_curve_stage(state.curve_var.get(), time_str)
+    print("curve_description")
+    print(curve_description)
+    state.curve_description_var.set(curve_description)
 
 def update_plots(state: Any) -> None:
     """Aktualizuje wykresy temperatury."""
     try:
         if state.temp_plot:
             actual = float(state.temperature_approximate_var.get())
-            expected = float(state.temperature_expected_var.get())
             max_time = max(state.temperature_schedule.keys()) * 3600
             if state.elapsed_time <= max_time:
-                state.temp_plot.update_plot(state.elapsed_time, actual, expected)
+                state.temp_plot.update_plot(state.elapsed_time, actual)
                 state.temp_plot.canvas.draw()
                 state.temp_plot.canvas.flush_events()
     except Exception as e:

@@ -53,7 +53,8 @@ class GlobalState:
         self.temperature_expected_var = None
         self.temperature_approximate_var = None
         self.progres_var_percent = None
-        
+        self.curve_description_var = None
+        self.curve_description = None
         # Zmienne stanu
         self.temp_plot = None
         self.progress_bar = None
@@ -66,6 +67,7 @@ class GlobalState:
         self.add_time = time_to_seconds("00:00")
         self.start_time = time.time()
         self.current_time = self.start_time
+        self.last_update_time = self.start_time
         
         # Obiekty
         self.temperature_curves = TemperatureCurves()
@@ -104,6 +106,10 @@ class GlobalState:
             self.root.geometry(f"{self.config.get_gui_value('WINDOW_WIDTH')}x{self.config.get_gui_value('WINDOW_HEIGHT')}")
             self.root.title("Kiln Control System")
             
+            # Sprawdź, czy główne okno zostało utworzone
+            if not self.root:
+                raise RuntimeError("Nie udało się utworzyć głównego okna")
+            
             # Inicjalizuj zmienne Tkinter
             self.curve_var = tk.StringVar(master=self.root, value=self.config.get_gui_value('DEFAULT_CURVE'))
             self.progress_var = tk.DoubleVar(master=self.root, value=0)
@@ -125,7 +131,9 @@ class GlobalState:
             self.temperature_expected_var = tk.DoubleVar(master=self.root, value="0.0")
             self.temperature_approximate_var = tk.DoubleVar(master=self.root, value="0.0")
             self.progres_var_percent = tk.StringVar(master=self.root, value="0")
-            
+            self.curve_description_var = tk.StringVar(master=self.root, value="")
+            self.curve_description = tk.StringVar(master=self.root, value="")
+
             # Utwórz wskaźnik LED
             self.led_indicator = LEDIndicator(self.root)
         except Exception as e:
@@ -158,13 +166,26 @@ class GlobalState:
             'temperature_ir_var': self.temperature_ir_var,
             'temperature_expected_var': self.temperature_expected_var,
             'temperature_approximate_var': self.temperature_approximate_var,
-            'progres_var_percent': self.progres_var_percent
+            'progres_var_percent': self.progres_var_percent,
+            'curve_description_var': self.curve_description_var,
+            'curve_description': self.curve_description
         }
         
     def update_time(self):
         """Aktualizuje czas w stanie."""
         self.elapsed_time = time.time() - self.start_time
         self.current_time = time.time()
+        
+        # Pobierz wartości ze zmiennych Tkinter
+        curve_name = self.curve_var.get() if self.curve_var else ""
+        elapsed_time_str = self.elapsed_time_var.get() if self.elapsed_time_var else "00:00:00"
+        
+        # Pobierz opis krzywej
+        curve_desc = self.temperature_curves.get_curve_stage(curve_name, elapsed_time_str)
+        
+        # Ustaw opis krzywej w zmiennej Tkinter
+        if self.curve_description_var:
+            self.curve_description_var.set(curve_desc)
         
     def reset_time(self):
         """Resetuje czas w stanie."""

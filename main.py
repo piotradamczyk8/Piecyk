@@ -57,6 +57,10 @@ def setup_gui():
     state.global_root = state.root
     state.global_file = state.csv_logger
 
+    # Pobierz domyślną krzywą z konfiguracji
+    default_curve = state.config.get_gui_value('DEFAULT_CURVE')
+    curve_description = state.temperature_curves.get_curve_stage(default_curve, "00:00:00")
+
     gui_setup = GUISetup(
         root=state.root,
         curve_var=state.curve_var,
@@ -77,7 +81,7 @@ def setup_gui():
         bottom_cover_temperature=state.bottom_cover_temperature,
         humidity=state.humidity,
         progres_var_percent=state.progres_var_percent,
-        curve_description=state.temperature_curves.get_curve_stage(state.curve_var.get(), "00:00:00")
+        curve_description=curve_description
     )
 
     def on_finish():
@@ -143,8 +147,14 @@ state.thermocouple = Thermocouple()
 state.ssr = SSR()
 
 # Inicjalizacja GUI i wykresu
-state.init_gui()
-setup_gui()
+state.init_gui()  # Inicjalizuje główne okno i zmienne Tkinter
+
+# Poczekaj na utworzenie głównego okna
+if not state.root:
+    raise RuntimeError("Nie udało się utworzyć głównego okna")
+
+# Inicjalizacja interfejsu użytkownika
+setup_gui()  # Używa zmiennych Tkinter
 
 # Inicjalizacja loggera CSV
 state.setup_csv_logger()
@@ -156,68 +166,71 @@ try:
     # Główna pętla programu
     state.reset_time()
     while True:
-        # Odczyty sensorów i obliczenia
-        try: 
-            update_temperature(state.thermocouple, state.temp_calc, state.temperature_thermocouple_var, state.temperature_approximate_var)
-        except Exception as e: 
-            print(f"Error updating temperature: {e}")
+        current_time = time.time()
+        if current_time - state.last_update_time >= 0.01:
+            state.last_update_time = current_time
+            # Odczyty sensorów i obliczenia
+            try: 
+                update_temperature(state.thermocouple, state.temp_calc, state.temperature_thermocouple_var, state.temperature_approximate_var)
+            except Exception as e: 
+                print(f"Error updating temperature: {e}")
 
-        # Oblicz nowe sterowanie PID
-        try:
-            state.on_delay = update_PID(
-                state.temperature_approximate_var, 
-                state.impulse_after_var, 
-                state.config, 
-                state.temperature_curves, 
-                state.curve_var, 
-                state.elapsed_time
-            )
-        except Exception as e: 
-            print(f"Error updating PID: {e}")
+            # Oblicz nowe sterowanie PID
+            try:
+                state.on_delay = update_PID(
+                    state.temperature_approximate_var, 
+                    state.impulse_after_var, 
+                    state.config, 
+                    state.temperature_curves, 
+                    state.curve_var,
+                    state.elapsed_time
+                )
+            except Exception as e: 
+                print(f"Error updating PID: {e}")
 
-        # Aktualizacja GUI i zapisu danych
-        try:
-            update_time(
-                state.elapsed_time, 
-                state.temperature_schedule, 
-                state.elapsed_time_var, 
-                state.remaining_time_var, 
-                state.final_time_var, 
-                state.progress_var, 
-                state.progress_bar, 
-                state.progres_var_percent, 
-                state.add_time
-            )
-        except Exception as e: 
-            print(f"Error updating time labels: {e}")
+            # Aktualizacja GUI i zapisu danych
+            try:
+                update_time(
+                    state.elapsed_time, 
+                    state.temperature_schedule, 
+                    state.elapsed_time_var, 
+                    state.remaining_time_var, 
+                    state.final_time_var, 
+                    state.progress_var, 
+                    state.progress_bar, 
+                    state.progres_var_percent, 
+                    state.add_time,
+                    state.curve_description_var.get() if state.curve_description_var else "",
+                    state.curve_description_var
+                )
+            except Exception as e: 
+                print(f"Error updating time labels: {e}")
 
-        try:
-            expected_temp = get_expected_temperature(
-                state.temperature_curves, 
-                state.curve_var, 
-                state.elapsed_time
-            )
-            state.temperature_expected_var.set(f"{expected_temp:.2f}")
-        except Exception as e: 
-            print(f"Error getting expected temperature: {e}")  
+            try:
+                expected_temp = get_expected_temperature(
+                    state.temperature_curves, 
+                    state.curve_var, 
+                    state.elapsed_time
+                )
+                state.temperature_expected_var.set(f"{expected_temp:.2f}")
+            except Exception as e: 
+                print(f"Error getting expected temperature: {e}")  
 
-        on_delay_sek = state.on_delay / 1000    
-        # Sterowanie triakiem
-        if on_delay_sek > 0: 
-            state.ssr.on()
-            state.led_indicator.turn_on()
-            state.root.update()
-            time.sleep(on_delay_sek)
-            state.ssr.off()
-            state.led_indicator.turn_off()
-            state.root.update()
-            time.sleep(state.MAX_TIME_ON/1000 - on_delay_sek)
+            on_delay_sek = state.on_delay / 1000    
+            # Sterowanie triakiem
+            if on_delay_sek > 0: 
+                state.ssr.on()
+                state.led_indicator.turn_on()
+                state.root.update()
+                time.sleep(on_delay_sek)
+                state.ssr.off()
+                state.led_indicator.turn_off()
+                state.root.update()
+                #time.sleep(state.MAX_TIME_ON/1000 - on_delay_sek)
 
-        # Aktualizacja danych i wykresu co 1 sekundę
-        if time.time() - state.current_time >= 1:
             state.update_time()
-            current_pzem_time = time.time()
 
+            
             try: 
                 update_pzem_data(
                     state.pzem, 
@@ -230,7 +243,8 @@ try:
                 )
             except Exception as e: 
                 print(f"Error updating PZEM data: {e}")   
-            
+
+
             # Aktualizacja wykresu
             try:
                 if state.temp_plot:
@@ -240,12 +254,12 @@ try:
                         # Znajdź maksymalny czas w harmonogramie
                         max_time = max(time_to_seconds(point['time']) for point in state.temperature_schedule['points'])
                         if state.elapsed_time <= max_time:
-                            state.temp_plot.update_plot(state.elapsed_time, actual, expected)
-                            state.temp_plot.canvas.draw()
-                            state.temp_plot.canvas.flush_events()
+                            actual = float(state.temperature_approximate_var.get())
+                            state.temp_plot.update_plot(state.elapsed_time, actual)
             except Exception as e:
                 print(f"Error updating plot: {e}")
 
+            
             # Zapis danych do CSV
             state.csv_logger.write_data([
                 time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -260,13 +274,10 @@ try:
                 state.freq_var.get(),
                 state.cycle_var.get()
             ])
-
-            # Zaktualizuj current_time
-            state.current_time = current_pzem_time
-
-        # Odświeżenie GUI Tkinter
-        state.root.update_idletasks()
-        state.root.update()
+            
+            # Odświeżenie GUI Tkinter
+            state.root.update_idletasks()
+            state.root.update()
 
 except KeyboardInterrupt:
     state.ssr.off()

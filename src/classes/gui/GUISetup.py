@@ -35,7 +35,7 @@ class GUISetup:
         self.bottom_cover_temperature = bottom_cover_temperature
         self.humidity = humidity
         self.progres_var_percent = progres_var_percent
-        self.curve_description_var = tk.StringVar(value=curve_description)
+        self.curve_description_var = tk.StringVar(master=self.root, value=curve_description)
 
         self.frame: Optional[tk.Frame] = None
         self.temp_plot = None

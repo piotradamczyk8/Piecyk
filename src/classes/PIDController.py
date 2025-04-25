@@ -1,5 +1,6 @@
 import time
 from src.classes.Config import Config
+from simple_pid import PID
 
 class PIDController:
     def __init__(self, setpoint, Kp=160, Ki=80, Kd=4):
@@ -12,26 +13,15 @@ class PIDController:
         self.last_time = time.time()
         self.config = Config()
         self.max_time_on = self.config.get_power_value('MAX_TIME_ON')
+        self.pid = PID(Kp, Ki, Kd, setpoint=setpoint) 
+        self.pid.output_limits = (0, self.max_time_on)
 
-    def compute_power(self, current_value):
-        """Oblicza moc wyjściową na podstawie wartości aktualnej i zadanej."""
-        current_time = time.time()
-        dt = current_time - self.last_time
+    def compute_power(self, current_temperature):
+        """
+        Oblicza wartość mocy na podstawie aktualnej temperatury.
 
-        error = self.setpoint - current_value
-        self.integral += error * dt
-        derivative = (error - self.last_error) / dt if dt > 0 else 0
-
-        output = self.Kp * error + self.Ki * self.integral + self.Kd * derivative
-
-        # Ograniczenie wyjścia do zakresu 0-100%
-        output = max(0, min(100, output))
-
-        # Konwersja procentu na czas włączenia w milisekundach
-        time_on = (output / 100) * self.max_time_on
-
-        self.last_error = error
-        self.last_time = current_time
-
-        return time_on
+        :param current_temperature: Aktualna temperatura pieca (°C)
+        :return: Wartość mocy (0-1000)
+        """
+        return self.pid(current_temperature)
  

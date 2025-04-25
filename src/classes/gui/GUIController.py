@@ -29,9 +29,7 @@ class GUIController:
             # Wyczyść dane wykresu
             self.state.temp_plot.time_data = []
             self.state.temp_plot.temp_actual_data = []
-            self.state.temp_plot.temp_expected_data = []
             self.state.temp_plot.line_actual.set_data([], [])
-            self.state.temp_plot.line_expected.set_data([], [])
             self.state.temp_plot.line_current.set_data([], [])
             
             # Narysuj nowy profil
@@ -43,8 +41,7 @@ class GUIController:
             
             # Aktualizuj wykres z początkowymi wartościami
             actual = float(self.state.temperature_approximate_var.get())
-            expected = float(self.state.temperature_expected_var.get())
-            self.state.temp_plot.update_plot(self.state.elapsed_time, actual, expected)
+            self.state.temp_plot.update_plot(self.state.elapsed_time, actual)
 
     def set_initial_time(self):
         """Ustawia początkowy czas dla harmonogramu."""
@@ -72,8 +69,7 @@ class GUIController:
                 
                 # Aktualizuj wykres z początkowymi wartościami
                 actual = float(self.state.temperature_approximate_var.get())
-                expected = float(self.state.temperature_expected_var.get())
-                self.state.temp_plot.update_plot(self.state.elapsed_time, actual, expected)
+                self.state.temp_plot.update_plot(self.state.elapsed_time, actual)
                
                 # Odśwież wykres
                 self.state.temp_plot.canvas.draw()
@@ -91,7 +87,9 @@ class GUIController:
                     self.state.progress_var, 
                     self.state.progress_bar, 
                     self.state.progres_var_percent, 
-                    self.state.add_time
+                    self.state.add_time,
+                    self.state.curve_description_var.get() if self.state.curve_description_var else "",
+                    self.state.curve_description_var
                 )
         except Exception as e:
             print(f"Błąd przy ustawianiu początkowego czasu: {e}")

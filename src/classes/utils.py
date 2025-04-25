@@ -110,7 +110,7 @@ def update_time(elapsed_time: float, temperature_schedule: Dict[str, Any],
                 elapsed_time_var: Any, remaining_time_var: Any, 
                 final_time_var: Any, progress_var: Any, 
                 progress_bar: Any, progres_var_percent: Any,
-                add_time: float) -> None:
+                add_time: float, curve_description: str, curve_description_var: Any) -> None:
     """Aktualizuje etykiety czasu i postępu."""
     hours, remainder = divmod(int(elapsed_time), 3600)
     minutes, seconds = divmod(remainder, 60)
@@ -150,6 +150,7 @@ def update_time(elapsed_time: float, temperature_schedule: Dict[str, Any],
     final_time_var.set(final_time)
 
     progres_var_percent.set(f"{progress:.2f}%")
+    curve_description_var.set(curve_description + " " + final_time)
 
 def write_data(file_handle: Any, data: Dict[str, Any]) -> None:
     """Zapisuje dane do pliku CSV."""
