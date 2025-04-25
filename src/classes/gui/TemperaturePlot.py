@@ -177,21 +177,6 @@ class TemperaturePlot:
             # Aktualizuj pionową linię czasu
             max_temp = max(self.temp_actual_data)
             self.line_current.set_data([elapsed_time, elapsed_time], [0, max_temp])
-          
-            # Aktualizuj gradient
-            if self.temp_actual_data:
-                min_temp = min(self.temp_actual_data)
-                max_temp = max(self.temp_actual_data)
-                temp_range = max_temp - min_temp if max_temp > min_temp else 1
-                
-                # Aktualizuj zakres gradientu
-                self.gradient_image.set_extent([0, len(self.temp_actual_data), min_temp, max_temp])
-                self.gradient_image.set_visible(True)
-            
-            # Aktualizuj zakres osi
-            if self.temp_actual_data:
-                self.ax.set_xlim(0, len(self.temp_actual_data))
-                self.ax.set_ylim(min(self.temp_actual_data) - 50, max(self.temp_actual_data) + 50)
             
         except Exception as e:
             print(f"Błąd przy aktualizacji wykresu: {e}")
