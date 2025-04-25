@@ -1,5 +1,6 @@
 import time
-from src.classes.utils import time_to_seconds, update_time
+from src.classes.utils.utils import time_to_seconds, update_time
+from src.classes.utils.utils import set_temperature_ir
 
 class GUIController:
     def __init__(self, state):
@@ -95,7 +96,6 @@ class GUIController:
 
     def set_temperature_ir_wrapper(self, gui_setup):
         """Wrapper dla funkcji set_temperature_ir z odpowiednimi argumentami."""
-        from src.classes.utils import set_temperature_ir
         set_temperature_ir(
             gui_setup.get_spinbox_temperature_ir(),
             self.state.temperature_ir_var,

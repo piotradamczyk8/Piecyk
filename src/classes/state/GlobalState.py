@@ -4,15 +4,15 @@ import lgpio
 import board
 import busio
 import adafruit_sht31d
-from src.classes.Config import Config
-from src.classes.TemperatureCurves import TemperatureCurves
-from src.classes.TemperatureApproximator import TemperatureApproximator
+from src.classes.config.Config import Config
+from src.classes.calculates.TemperatureCurves import TemperatureCurves
+from src.classes.calculates.TemperatureApproximator import TemperatureApproximator
 from src.classes.gui.LEDIndicator import LEDIndicator
-from src.classes.utils import time_to_seconds
+from src.classes.utils.utils import time_to_seconds
 from src.classes.devices.PZEM_004T import PZEM_004T
 from src.classes.devices.Thermocouple import Thermocouple
 from src.classes.devices.SSR import SSR
-from src.classes.CSVLogger import CSVLogger
+from src.classes.logger.CSVLogger import CSVLogger
 
 class GlobalState:
     def __init__(self, init_gui=False):

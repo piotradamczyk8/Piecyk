@@ -3,10 +3,12 @@ import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import time
+import numpy as np
+from typing import List, Optional
 
 class TemperaturePlot:
     def __init__(self, parent_frame):
-        self.fig = Figure(figsize=(6, 3), dpi=100)
+        self.fig = Figure(figsize=(8, 4), dpi=100)
         self.ax = self.fig.add_subplot(111)
 
         self.ax.set_title("Temperature Profile")
@@ -73,6 +75,25 @@ class TemperaturePlot:
         self.canvas.mpl_connect('pick_event', self.on_pick)
         self.canvas.mpl_connect('axes_enter_event', self.on_axes_enter)
         self.canvas.mpl_connect('axes_leave_event', self.on_axes_leave)
+
+        # Tworzenie gradientu temperatury barwowej
+        self.gradient = np.linspace(0, 1, 100).reshape(1, -1)
+        self.gradient = np.vstack((self.gradient, self.gradient))
+        
+        # Inicjalizacja gradientu
+        self.gradient_image = self.ax.imshow(
+            self.gradient,
+            aspect='auto',
+            extent=[0, 1, 0, 1],
+            alpha=0.2,
+            cmap='hot',
+            origin='lower'
+        )
+        self.gradient_image.set_visible(False)
+        
+        # Ustawienie zakresu osi
+        self.ax.set_xlim(0, 1)
+        self.ax.set_ylim(0, 1)
 
     def on_pick(self, event):
         if event.artist == self.line_current:
@@ -157,6 +178,21 @@ class TemperaturePlot:
             max_temp = max(self.temp_actual_data)
             self.line_current.set_data([elapsed_time, elapsed_time], [0, max_temp])
           
+            # Aktualizuj gradient
+            if self.temp_actual_data:
+                min_temp = min(self.temp_actual_data)
+                max_temp = max(self.temp_actual_data)
+                temp_range = max_temp - min_temp if max_temp > min_temp else 1
+                
+                # Aktualizuj zakres gradientu
+                self.gradient_image.set_extent([0, len(self.temp_actual_data), min_temp, max_temp])
+                self.gradient_image.set_visible(True)
+            
+            # Aktualizuj zakres osi
+            if self.temp_actual_data:
+                self.ax.set_xlim(0, len(self.temp_actual_data))
+                self.ax.set_ylim(min(self.temp_actual_data) - 50, max(self.temp_actual_data) + 50)
+            
         except Exception as e:
             print(f"Błąd przy aktualizacji wykresu: {e}")
 

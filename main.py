@@ -16,19 +16,19 @@ import os
 
 from src.classes.devices.PZEM_004T import PZEM_004T
 from src.classes.devices.Thermocouple import Thermocouple
-from src.classes.TemperatureApproximator import TemperatureApproximator
-from src.classes.PIDController import PIDController
-from src.classes.TemperatureCurves import TemperatureCurves
+from src.classes.calculates.TemperatureApproximator import TemperatureApproximator
+from src.classes.controllers.PIDController import PIDController
+from src.classes.calculates.TemperatureCurves import TemperatureCurves
 from src.classes.gui.LEDIndicator import LEDIndicator
 from src.classes.gui.TemperaturePlot import TemperaturePlot
 from src.classes.gui.GUISetup import GUISetup
-from src.classes.Config import Config
+from src.classes.config.Config import Config
 from src.classes.gui.PowerControl import PowerControl
 from src.classes.devices.SSR import SSR
-from src.classes.CSVLogger import CSVLogger
-from src.classes.GlobalState import GlobalState
-from src.classes.gui.GUIController import GUIController
-from src.classes.utils import (
+from src.classes.logger.CSVLogger import CSVLogger
+from src.classes.state.GlobalState import GlobalState
+from src.classes.controllers.GUIController import GUIController
+from src.classes.utils.utils import (
     time_to_seconds, seconds_to_time, update_time, write_data,
     setup_gpio, stop_program, clear_inputs, set_inputs,
     set_temperature_ir, update_pzem_data, update_temperature,

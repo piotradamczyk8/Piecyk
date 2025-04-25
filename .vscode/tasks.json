@@ -19,7 +19,7 @@
             "args": [
                 "-X",
                 "rpi",
-                "/usr/bin/python3 ${file}"
+                "PYTHONPATH=/home/piotradamczyk/Projects/Piecyk /usr/bin/python3 ${file}"
             ],
             "problemMatcher": []
         },
@@ -30,7 +30,7 @@
             "args": [
                 "-X",
                 "rpi",
-                "/usr/bin/python3 /home/piotradamczyk/Projects/Piecyk/main.py"
+                "PYTHONPATH=/home/piotradamczyk/Projects/Piecyk /usr/bin/python3 /home/piotradamczyk/Projects/Piecyk/main.py"
             ],
             "problemMatcher": [],
             "group": {

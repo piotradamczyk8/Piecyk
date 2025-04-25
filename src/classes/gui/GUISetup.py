@@ -3,7 +3,7 @@ from tkinter import ttk
 from typing import Optional
 from src.classes.gui.TemperaturePlot import TemperaturePlot
 from src.classes.gui.LEDIndicator import LEDIndicator
-from src.classes.TemperatureCurves import TemperatureCurves
+from src.classes.calculates.TemperatureCurves import TemperatureCurves
 
 class GUISetup:
     def __init__(self, root: tk.Tk, curve_var: tk.StringVar, progress_var: tk.DoubleVar,
@@ -58,11 +58,17 @@ class GUISetup:
         available_curves = [curve for curve in self.temperature_curves.get_curves() if curve.strip()]
         
         # Utwórz menu wyboru krzywej
-        curve_option_menu = tk.OptionMenu(controls_frame, self.curve_var, *available_curves,
-                                        command=lambda sel=self.curve_var: set_temperature_schedule(self.curve_var))
-        curve_option_menu.config(width=15)
-        curve_option_menu.pack(pady=(10, 10))
-
+        if available_curves:
+            self.curve_var.set(available_curves[0])  # Ustaw pierwszą krzywą jako domyślną
+            curve_option_menu = tk.OptionMenu(controls_frame, self.curve_var, *available_curves)
+            curve_option_menu.config(width=15)
+            curve_option_menu.pack(pady=(10, 10))
+            
+            # Dodaj obsługę zmiany krzywej
+            self.curve_var.trace_add('write', lambda *args: set_temperature_schedule(self.curve_var))
+        else:
+            # Jeśli nie ma dostępnych krzywych, wyświetl komunikat
+            tk.Label(controls_frame, text="Brak dostępnych krzywych").pack(pady=(10, 10))
 
         # Frame for initial time
         initial_time_frame = tk.Frame(controls_frame)

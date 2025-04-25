@@ -1,5 +1,5 @@
 import time
-from src.classes.Config import Config
+from src.classes.config.Config import Config
 from simple_pid import PID
 
 class PIDController:

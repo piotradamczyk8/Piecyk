@@ -1,5 +1,5 @@
 import lgpio
-from src.classes.Config import Config
+from src.classes.config.Config import Config
 
 class SSR:
     def __init__(self):

@@ -4,7 +4,29 @@ from typing import Dict, List, Optional, Tuple
 
 class TemperatureCurves:
     def __init__(self):
-        self.curves_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'curves')
+        # Lista możliwych lokalizacji katalogu z krzywymi
+        possible_locations = [
+            os.path.join(os.path.dirname(os.path.dirname(__file__)), 'curves'),
+            os.path.join(os.path.dirname(__file__), 'curves'),
+            '/home/piotradamczyk/Projects/Piecyk/src/curves',
+            'src/curves',
+            'curves'
+        ]
+        
+        # Znajdź pierwszy istniejący katalog
+        self.curves_dir = None
+        for location in possible_locations:
+            if os.path.exists(location):
+                self.curves_dir = location
+                print(f"Znaleziono katalog z krzywymi w: {location}")
+                break
+        
+        if self.curves_dir is None:
+            print("Nie znaleziono katalogu z krzywymi")
+            self.curves_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'curves')
+            os.makedirs(self.curves_dir, exist_ok=True)
+            print(f"Utworzono nowy katalog z krzywymi w: {self.curves_dir}")
+        
         self.curves: Dict[str, Dict] = {}
         self._load_all_curves()
 
