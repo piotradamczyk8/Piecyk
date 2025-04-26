@@ -11,7 +11,7 @@ class TemperaturePlot:
         self.fig = Figure(figsize=(8, 4), dpi=100)
         self.ax = self.fig.add_subplot(111)
 
-        self.ax.set_title("Temperature Profile")
+        self.ax.set_title(f"Temperature Profile Bisquit")
         self.ax.set_xlabel("Time (HH:MM)")
         self.ax.set_ylabel("Temperature (°C)")
 
@@ -170,7 +170,7 @@ class TemperaturePlot:
         """Aktualizuje wykres z nowymi danymi."""
         try:
             current_time = time.time()
-            if current_time - self.last_draw_time < 1:  # minimalny odstęp 1 sekundę
+            if current_time - self.last_draw_time < 10:  # minimalny odstęp 10 sekund
                 return
                 
             self.last_draw_time = current_time
@@ -239,4 +239,10 @@ class TemperaturePlot:
         self.canvas.draw()
         self.canvas.flush_events()
         self.canvas_widget.update_idletasks()
-        self.canvas_widget.update() 
+        self.canvas_widget.update()
+
+    def set_title(self, title: str):
+        """Ustawia tytuł wykresu."""
+        self.ax.set_title(title)
+        self.canvas.draw()
+        self.canvas.flush_events() 

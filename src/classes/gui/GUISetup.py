@@ -46,6 +46,7 @@ class GUISetup:
 
         # Inicjalizacja TemperatureCurves
         self.temperature_curves = TemperatureCurves()
+        
 
     def setup_gui(self, set_temperature_schedule, set_initial_time, set_temperature_ir, stop_program):
         """Konfiguruje interfejs użytkownika."""
@@ -57,18 +58,40 @@ class GUISetup:
         # Pobierz dostępne krzywe z TemperatureCurves i usuń puste wartości
         available_curves = [curve for curve in self.temperature_curves.get_curves() if curve.strip()]
         
+        # Sortuj krzywe alfabetycznie
+        available_curves = sorted(available_curves)
+        
         # Utwórz menu wyboru krzywej
         if available_curves:
             self.curve_var.set(available_curves[0])  # Ustaw pierwszą krzywą jako domyślną
-            curve_option_menu = tk.OptionMenu(controls_frame, self.curve_var, *available_curves)
-            curve_option_menu.config(width=15)
-            curve_option_menu.pack(pady=(10, 10))
+            
+            # Frame dla comboboxa
+            curve_frame = tk.Frame(controls_frame)
+            curve_frame.pack(pady=(10, 10), fill=tk.X, anchor=tk.CENTER)
+            
+            # Combobox 
+            curve_combobox = ttk.Combobox(
+                curve_frame,
+                textvariable=self.curve_var,
+                values=available_curves,
+                state="readonly",           
+                width=60  # szerokość w znakach
+            )
+            curve_combobox.pack(side=tk.LEFT, padx=200, fill=tk.X, expand=False, anchor=tk.CENTER)
             
             # Dodaj obsługę zmiany krzywej
-            self.curve_var.trace_add('write', lambda *args: set_temperature_schedule(self.curve_var))
+            def on_curve_change(event):
+                set_temperature_schedule(self.curve_var)
+                # Aktualizuj tytuł wykresu
+                if self.temp_plot:
+                    self.temp_plot.set_title(f"Temperature Profile {self.curve_var.get()}")
+                
+            curve_combobox.bind('<<ComboboxSelected>>', on_curve_change)
+            
         else:
             # Jeśli nie ma dostępnych krzywych, wyświetl komunikat
             tk.Label(controls_frame, text="Brak dostępnych krzywych").pack(pady=(10, 10))
+
 
         # Frame for initial time
         initial_time_frame = tk.Frame(controls_frame)
@@ -103,21 +126,14 @@ class GUISetup:
             command=lambda: self.update_time(set_initial_time)
         )
         self.minutes_spinbox.pack(side=tk.LEFT, padx=2)
-        
-        # Przycisk do resetowania czasu
-        self.reset_button = tk.Button(
-            initial_time_frame,
-            text="Reset",
-            command=lambda: self.reset_time(set_initial_time)
-        )
-        self.reset_button.pack(side=tk.LEFT, padx=5)
+
 
         # Frame for curve description
         description_frame = tk.Frame(controls_frame)
         description_frame.pack(pady=5, fill=tk.X)
-        tk.Label(description_frame, text="").pack(side=tk.TOP, padx=5)
+        tk.Label(description_frame, text="").pack(side=tk.TOP, padx=10)
         description_label = tk.Label(description_frame, textvariable=self.curve_description_var, wraplength=400)
-        description_label.pack(side=tk.TOP, padx=5, fill=tk.X, expand=True)
+        description_label.pack(side=tk.TOP, padx=10, fill=tk.X, expand=True)
 
         # Progress bar
         self.progress_bar = ttk.Progressbar(controls_frame, variable=self.progress_var, 
@@ -135,45 +151,42 @@ class GUISetup:
         info_frame.pack(pady=5)
 
         # Labels and values in grid
-        tk.Label(info_frame, text="Elapsed Time:").grid(row=0, column=0, padx=5, sticky="w")
-        tk.Label(info_frame, textvariable=self.elapsed_time_var).grid(row=0, column=1, padx=5, sticky="w")
-        tk.Label(info_frame, text="Remaining Time:").grid(row=1, column=0, padx=5, sticky="w")
-        tk.Label(info_frame, textvariable=self.remaining_time_var).grid(row=1, column=1, padx=5, sticky="w")
-        tk.Label(info_frame, text="Final time:").grid(row=2, column=0, padx=5, sticky="w")
-        tk.Label(info_frame, textvariable=self.final_time_var).grid(row=2, column=1, padx=5, sticky="w")
+        tk.Label(info_frame, text="Elapsed Time:").grid(row=0, column=0, padx=10, sticky="w")
+        tk.Label(info_frame, textvariable=self.elapsed_time_var).grid(row=0, column=1, padx=10, sticky="w")
+        tk.Label(info_frame, text="Remaining Time:").grid(row=1, column=0, padx=10, sticky="w")
+        tk.Label(info_frame, textvariable=self.remaining_time_var).grid(row=1, column=1, padx=10, sticky="w")
+        tk.Label(info_frame, text="Final time:").grid(row=2, column=0, padx=10, sticky="w")
+        tk.Label(info_frame, textvariable=self.final_time_var).grid(row=2, column=1, padx=10, sticky="w")
 
-        tk.Label(info_frame, text="Cycle (ms):").grid(row=0, column=2, padx=5, sticky="w")
-        tk.Label(info_frame, textvariable=self.cycle_var).grid(row=0, column=3, padx=5, sticky="w")
-        tk.Label(info_frame, text="Triac on (ms):", fg="maroon").grid(row=1, column=2, padx=5, sticky="w")
-        tk.Label(info_frame, textvariable=self.impulse_after_var, fg="maroon").grid(row=1, column=3, padx=5, sticky="w")
+        tk.Label(info_frame, text="Cycle (ms):").grid(row=0, column=2, padx=10, sticky="w")
+        tk.Label(info_frame, textvariable=self.cycle_var).grid(row=0, column=3, padx=10, sticky="w")
+        tk.Label(info_frame, text="Triac on (ms):", fg="maroon").grid(row=1, column=2, padx=10, sticky="w")
+        tk.Label(info_frame, textvariable=self.impulse_after_var, fg="maroon").grid(row=1, column=3, padx=10, sticky="w")
 
-        tk.Label(info_frame, text="Voltage (V):").grid(row=3, column=0, padx=5, sticky="w")
-        tk.Label(info_frame, textvariable=self.voltage_var).grid(row=3, column=1, padx=5, sticky="w")
-        tk.Label(info_frame, text="Current (A):").grid(row=4, column=0, padx=5, sticky="w")
-        tk.Label(info_frame, textvariable=self.current_var).grid(row=4, column=1, padx=5, sticky="w")
-        tk.Label(info_frame, text="Power (W):", fg="maroon").grid(row=5, column=0, padx=5, sticky="w")
-        tk.Label(info_frame, textvariable=self.power_var, fg="maroon").grid(row=5, column=1, padx=5, sticky="w")
-        tk.Label(info_frame, text="Energy (Wh):").grid(row=6, column=0, padx=5, sticky="w")
-        tk.Label(info_frame, textvariable=self.energy_var).grid(row=6, column=1, padx=5, sticky="w")
+        tk.Label(info_frame, text="Voltage (V):").grid(row=3, column=0, padx=10, sticky="w")
+        tk.Label(info_frame, textvariable=self.voltage_var).grid(row=3, column=1, padx=10, sticky="w")
+        tk.Label(info_frame, text="Current (A):").grid(row=4, column=0, padx=10, sticky="w")
+        tk.Label(info_frame, textvariable=self.current_var).grid(row=4, column=1, padx=10, sticky="w")
+        tk.Label(info_frame, text="Power (W):", fg="maroon").grid(row=5, column=0, padx=10, sticky="w")
+        tk.Label(info_frame, textvariable=self.power_var, fg="maroon").grid(row=5, column=1, padx=10, sticky="w")
+        tk.Label(info_frame, text="Energy (Wh):").grid(row=6, column=0, padx=10, sticky="w")
+        tk.Label(info_frame, textvariable=self.energy_var).grid(row=6, column=1, padx=10, sticky="w")
 
-        tk.Label(info_frame, text="Thermocouple (°C):").grid(row=3, column=2, padx=5, sticky="w")
-        tk.Label(info_frame, textvariable=self.temperature_thermocouple_var).grid(row=3, column=3, padx=5, sticky="w")
-        tk.Label(info_frame, text="Temp. Approx (°C):", fg="maroon").grid(row=4, column=2, padx=5, sticky="w")
-        tk.Label(info_frame, textvariable=self.temperature_approximate_var, fg="maroon").grid(row=4, column=3, padx=5, sticky="w")
-        tk.Label(info_frame, text="Temp. Expected (°C):", fg="maroon").grid(row=5, column=2, padx=5, sticky="w")
-        tk.Label(info_frame, textvariable=self.temperature_expected_var, fg="maroon").grid(row=5, column=3, padx=5, sticky="w")
+        tk.Label(info_frame, text="Thermocouple (°C):").grid(row=3, column=2, padx=10, sticky="w")
+        tk.Label(info_frame, textvariable=self.temperature_thermocouple_var).grid(row=3, column=3, padx=10, sticky="w")
+        tk.Label(info_frame, text="Temp. Approx (°C):", fg="maroon").grid(row=4, column=2, padx=10, sticky="w")
+        tk.Label(info_frame, textvariable=self.temperature_approximate_var, fg="maroon").grid(row=4, column=3, padx=10, sticky="w")
+        tk.Label(info_frame, text="Temp. Expected (°C):", fg="maroon").grid(row=5, column=2, padx=10, sticky="w")
+        tk.Label(info_frame, textvariable=self.temperature_expected_var, fg="maroon").grid(row=5, column=3, padx=10, sticky="w")
 
         # Frame for IR correction
         ir_frame = tk.Frame(controls_frame)
         ir_frame.pack(pady=5)
-        tk.Label(ir_frame, text="Corrective temperature IR (°C):").pack(side=tk.LEFT, padx=5)
+        tk.Label(ir_frame, text="Corrective temperature IR (°C):").pack(side=tk.LEFT, padx=10)
         self.spinbox_temperature_ir = tk.Spinbox(ir_frame, from_=-1000, to=1000, increment=1, 
                                               textvariable=self.temperature_ir_var, width=5)
-        self.spinbox_temperature_ir.pack(side=tk.LEFT, padx=5)
-        tk.Button(ir_frame, text="SET", command=set_temperature_ir).pack(side=tk.LEFT, padx=5)
-
-        # FINISH button at the bottom of controls frame
-        tk.Button(controls_frame, text="FINISH", command=stop_program).pack(pady=(10, 10))
+        self.spinbox_temperature_ir.pack(side=tk.LEFT, padx=10)
+        tk.Button(ir_frame, text="SET", command=set_temperature_ir).pack(side=tk.LEFT, padx=10)
 
         # === Plot frame (lower part) ===
         plot_frame = tk.Frame(self.root)
@@ -186,6 +199,9 @@ class GUISetup:
         self.led_indicator.configure(bg="white")
         self.led_indicator.configure(width=2)
         self.led_indicator.configure(height=2)
+
+        # FINISH button at the bottom of controls frame
+        tk.Button(controls_frame, text="FINISH", command=stop_program).pack(pady=(10, 10))
 
     def get_initial_time_var(self) -> Optional[tk.StringVar]:
         """Zwraca zmienną przechowującą początkowy czas."""

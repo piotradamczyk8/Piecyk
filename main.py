@@ -226,7 +226,6 @@ try:
                 state.ssr.off()
                 state.led_indicator.turn_off()
                 state.root.update()
-                #time.sleep(state.MAX_TIME_ON/1000 - on_delay_sek)
 
             state.update_time()
 

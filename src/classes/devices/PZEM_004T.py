@@ -25,8 +25,7 @@ class PZEM_004T:
         
         if self.connection:            
             print("Connected to PZEM-004T")
-            time.sleep(1)
-            print("Ready")
+            time.sleep(1)            
             set_comunication_address = [0xB4, 0xC0, 0xA8, 0x01, 0x01, 0x00, 0x1E]
             voltage_read = [0xB0, 0xC0, 0xA8, 0x01, 0x01, 0x00, 0x1A]
             current_read = [0xB1, 0xC0, 0xA8, 0x01, 0x01, 0x00, 0x1B]
@@ -34,9 +33,6 @@ class PZEM_004T:
             energy_read = [0xB3, 0xC0, 0xA8, 0x01, 0x01, 0x00, 0x1D]
             frequency_read = [0xB4, 0xC0, 0xA8, 0x01, 0x01, 0x00, 0x1E]
             #self.client.send(voltage_read)
-            
-        else:
-            print("Failed to connect to PZEM-004T")
 
     def reset_energy(self):
         # Reset energy count
@@ -45,7 +41,6 @@ class PZEM_004T:
         # 0x80 CRC for slave address (0x01)
         # 0x11 CRC for magic code (0x42)         
         data = [0x01, 0x42, 0x80, 0x11]
-        print(self.client.send(data))
         time.sleep(2)
 
     def read_data(self):
