@@ -27,31 +27,54 @@ class TemperatureCurves:
             os.makedirs(self.curves_dir, exist_ok=True)
             print(f"Utworzono nowy katalog z krzywymi w: {self.curves_dir}")
         
-        self.curves: Dict[str, Dict] = {}
-        self._load_all_curves()
+        # Cache dla krzywych
+        self._curves_cache = {}
+        self._curves_names = None
+        self._load_curves_names()
 
-    def _load_all_curves(self) -> None:
-        """Wczytuje wszystkie krzywe z katalogu curves."""
+    def _load_curves_names(self) -> None:
+        """Wczytuje tylko nazwy dostępnych krzywych."""
         if not os.path.exists(self.curves_dir):
             os.makedirs(self.curves_dir)
+            self._curves_names = []
             return
 
-        for filename in os.listdir(self.curves_dir):
-            if filename.endswith('.json'):
-                curve_name = os.path.splitext(filename)[0]
-                try:
-                    with open(os.path.join(self.curves_dir, filename), 'r', encoding='utf-8') as f:
-                        self.curves[curve_name] = json.load(f)
-                except Exception as e:
-                    print(f"Błąd podczas wczytywania krzywej {filename}: {e}")
+        self._curves_names = [
+            os.path.splitext(filename)[0]
+            for filename in os.listdir(self.curves_dir)
+            if filename.endswith('.json')
+        ]
+
+    def _load_curve(self, name: str) -> Optional[Dict]:
+        """Wczytuje pojedynczą krzywą z pliku."""
+        if name in self._curves_cache:
+            return self._curves_cache[name]
+
+        filename = f"{name}.json"
+        filepath = os.path.join(self.curves_dir, filename)
+        
+        if not os.path.exists(filepath):
+            return None
+
+        try:
+            with open(filepath, 'r', encoding='utf-8') as f:
+                curve = json.load(f)
+                # Konwertuj czasy na sekundy dla wszystkich punktów
+                for point in curve['points']:
+                    point['time_seconds'] = self._time_to_seconds(point['time'])
+                self._curves_cache[name] = curve
+                return curve
+        except Exception as e:
+            print(f"Błąd podczas wczytywania krzywej {filename}: {e}")
+            return None
 
     def get_curves(self) -> List[str]:
         """Zwraca listę dostępnych krzywych."""
-        return list(self.curves.keys())
+        return self._curves_names
 
     def get_curve(self, name: str) -> Optional[Dict]:
         """Zwraca krzywą o podanej nazwie."""
-        return self.curves.get(name)
+        return self._load_curve(name)
 
     def _time_to_seconds(self, time_str: str) -> int:
         """
@@ -227,7 +250,7 @@ class TemperatureCurves:
         
         # Znajdź punkty do interpolacji
         points = curve['points']
-        times = [self._time_to_seconds(p['time']) for p in points]
+        times = [p['time_seconds'] for p in points]
         temps = [p['temperature'] for p in points]
         
         # Jeśli czas jest poza zakresem, zwróć graniczne wartości

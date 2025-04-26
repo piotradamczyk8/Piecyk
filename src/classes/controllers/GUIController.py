@@ -36,13 +36,13 @@ class GUIController:
             # Narysuj nowy profil
             self.state.temp_plot.draw_expected_profile(self.state.temperature_schedule)
             
-            # Odśwież wykres
-            self.state.temp_plot.canvas.draw()
-            self.state.temp_plot.canvas.flush_events()
-            
             # Aktualizuj wykres z początkowymi wartościami
             actual = float(self.state.temperature_approximate_var.get())
             self.state.temp_plot.update_plot(self.state.elapsed_time, actual)
+            
+            # Odśwież wykres tylko raz
+            self.state.temp_plot.canvas.draw()
+            self.state.temp_plot.canvas.flush_events()
 
     def set_initial_time(self):
         """Ustawia początkowy czas dla harmonogramu."""
@@ -71,26 +71,54 @@ class GUIController:
                 actual = float(self.state.temperature_approximate_var.get())
                 self.state.temp_plot.update_plot(self.state.elapsed_time, actual)
                
-                # Odśwież wykres
+                # Odśwież wykres tylko raz
                 self.state.temp_plot.canvas.draw()
                 self.state.temp_plot.canvas.flush_events()
-                self.state.temp_plot.canvas_widget.update_idletasks()
-                self.state.temp_plot.canvas_widget.update()
                 
-                # Aktualizuj etykiety czasu
-                update_time(
-                    self.state.elapsed_time, 
-                    self.state.temperature_schedule, 
-                    self.state.elapsed_time_var, 
-                    self.state.remaining_time_var, 
-                    self.state.final_time_var, 
-                    self.state.progress_var, 
-                    self.state.progress_bar, 
-                    self.state.progres_var_percent, 
-                    self.state.add_time,
-                    self.state.curve_description_var.get() if self.state.curve_description_var else "",
-                    self.state.curve_description_var
-                )
+                # Aktualizuj czerwoną linię czasu
+                if hasattr(self.state.temp_plot, 'line_current'):
+                    # Ustaw pełny zakres osi X
+                    max_time = max(time_to_seconds(point['time']) for point in self.state.temperature_schedule['points'])
+                    self.state.temp_plot.ax.set_xlim(0, max_time)
+                    
+                    # Aktualizuj formatowanie osi X z przesunięciem czasowym
+                    def time_formatter(x, pos):
+                        # Oblicz rzeczywisty czas (aktualny czas + przesunięcie)
+                        current_time = time.time()
+                        real_time = current_time + (x - self.state.elapsed_time)
+                        
+                        # Konwertuj na format HH:MM
+                        time_struct = time.localtime(real_time)
+                        return f"{time_struct.tm_hour:02d}:{time_struct.tm_min:02d}"
+                    
+                    self.state.temp_plot.ax.xaxis.set_major_formatter(time_formatter)
+                    
+                    # Aktualizuj czerwoną linię
+                    self.state.temp_plot.line_current.set_data([self.state.elapsed_time, self.state.elapsed_time], 
+                                                             [0, self.state.temp_plot.ax.get_ylim()[1]])
+                    
+                    # Odśwież wykres
+                    self.state.temp_plot.canvas.draw()
+                    self.state.temp_plot.canvas.flush_events()
+            
+            # Zawsze aktualizuj etykiety czasu i pasek postępu
+            update_time(
+                self.state.elapsed_time, 
+                self.state.temperature_schedule, 
+                self.state.elapsed_time_var, 
+                self.state.remaining_time_var, 
+                self.state.final_time_var, 
+                self.state.progress_var, 
+                self.state.progress_bar, 
+                self.state.progres_var_percent, 
+                self.state.add_time,
+                self.state.curve_description_var.get() if self.state.curve_description_var else "",
+                self.state.curve_description_var
+            )
+            
+            # Odśwież interfejs
+            self.state.root.update()
+                
         except Exception as e:
             print(f"Błąd przy ustawianiu początkowego czasu: {e}")
 
