@@ -4,7 +4,10 @@ from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import time
 import numpy as np
-from typing import List, Optional
+from typing import List, Optional, Dict
+from matplotlib.patches import Rectangle
+from matplotlib.text import Text
+from matplotlib.lines import Line2D
 
 class TemperaturePlot:
     def __init__(self, parent_frame):
@@ -21,6 +24,18 @@ class TemperaturePlot:
         self.line_profile, = self.ax.plot([], [], 'g:', label='Profile')
         # Vertical line for current point
         self.line_current = self.ax.axvline(x=0, color='r', linestyle='-', linewidth=2, label='Current point', picker=5)
+        
+        # Okienko z informacjami
+        self.info_box = Rectangle((0, 0), 0.1, 0.1, facecolor='white', edgecolor='black', alpha=0.8)
+        self.ax.add_patch(self.info_box)
+        self.info_text = self.ax.text(0, 0, '', fontsize=8, ha='left', va='bottom')
+        self.info_box.set_visible(False)
+        self.info_text.set_visible(False)
+
+        # Linie podziału i opisy sekcji
+        self.section_lines = []
+        self.section_texts = []
+        self.sections = {}  # Słownik przechowujący informacje o sekcjach
 
         # Ustawienie formatera osi X
         def time_formatter(x, pos):
@@ -169,11 +184,7 @@ class TemperaturePlot:
     def update_plot(self, elapsed_time, actual_temp):
         """Aktualizuje wykres z nowymi danymi."""
         try:
-            current_time = time.time()
-            if current_time - self.last_draw_time < 10:  # minimalny odstęp 10 sekund
-                return
-                
-            self.last_draw_time = current_time
+            self.last_draw_time = time.time()
             
             # Dodaj nowe dane
             self.time_data.append(elapsed_time)
@@ -183,6 +194,7 @@ class TemperaturePlot:
             # Aktualizuj pionową linię czasu
             max_temp = max(self.temp_actual_data)
             self.line_current.set_data([elapsed_time, elapsed_time], [0, max_temp])
+   
             
         except Exception as e:
             print(f"Błąd przy aktualizacji wykresu: {e}")
@@ -245,4 +257,42 @@ class TemperaturePlot:
         """Ustawia tytuł wykresu."""
         self.ax.set_title(title)
         self.canvas.draw()
-        self.canvas.flush_events() 
+        self.canvas.flush_events()
+
+    def add_section(self, start_time: int, end_time: int, name: str, description: str):
+        """Dodaje nową sekcję na wykresie."""
+        # Konwertuj czas na sekundy jeśli podano w formacie HH:MM
+        if isinstance(start_time, str):
+            hours, minutes = map(int, start_time.split(':'))
+            start_time = hours * 3600 + minutes * 60
+        if isinstance(end_time, str):
+            hours, minutes = map(int, end_time.split(':'))
+            end_time = hours * 3600 + minutes * 60
+
+        # Dodaj linię podziału
+        line = self.ax.axvline(x=end_time, color='gray', linestyle='--', alpha=0.5)
+        self.section_lines.append(line)
+
+        # Dodaj tekst z nazwą sekcji
+        text = self.ax.text((start_time + end_time) / 2, self.ax.get_ylim()[1] * 0.95,
+                           name, ha='center', va='top', fontsize=9,
+                           bbox=dict(facecolor='white', alpha=0.7, edgecolor='none'))
+        self.section_texts.append(text)
+
+        # Zapisz informacje o sekcji
+        self.sections[end_time] = {
+            'name': name,
+            'description': description,
+            'start_time': start_time,
+            'end_time': end_time
+        }
+
+    def clear_sections(self):
+        """Usuwa wszystkie sekcje z wykresu."""
+        for line in self.section_lines:
+            line.remove()
+        for text in self.section_texts:
+            text.remove()
+        self.section_lines = []
+        self.section_texts = []
+        self.sections = {} 

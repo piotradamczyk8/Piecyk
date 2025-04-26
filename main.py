@@ -81,7 +81,9 @@ def setup_gui():
         bottom_cover_temperature=state.bottom_cover_temperature,
         humidity=state.humidity,
         progres_var_percent=state.progres_var_percent,
-        curve_description=curve_description
+        curve_description=curve_description,
+        hours_var=state.hours_var,
+        minutes_var=state.minutes_var
     )
 
     def on_finish():
@@ -165,13 +167,22 @@ gui_controller.set_temperature_schedule(state.curve_var)
 try:
     # Główna pętla programu
     state.reset_time()
+    last_gui_update = time.time()
+    last_plot_update = time.time()
+    last_csv_update = time.time()
+    
     while True:
         current_time = time.time()
-        if current_time - state.last_update_time >= 0.01:
-            state.last_update_time = current_time
+        
+        # Aktualizacja GUI co 100ms
+        if current_time - last_gui_update >= 0.1:
+            last_gui_update = current_time
+            
             # Odczyty sensorów i obliczenia
             try: 
-                update_temperature(state.thermocouple, state.temp_calc, state.temperature_thermocouple_var, state.temperature_approximate_var)
+                update_temperature(state.thermocouple, state.temp_calc, 
+                                state.temperature_thermocouple_var, 
+                                state.temperature_approximate_var)
             except Exception as e: 
                 print(f"Error updating temperature: {e}")
 
@@ -188,7 +199,7 @@ try:
             except Exception as e: 
                 print(f"Error updating PID: {e}")
 
-            # Aktualizacja GUI i zapisu danych
+            # Aktualizacja etykiet czasu
             try:
                 update_time(
                     state.elapsed_time, 
@@ -206,6 +217,7 @@ try:
             except Exception as e: 
                 print(f"Error updating time labels: {e}")
 
+            # Aktualizacja oczekiwanej temperatury
             try:
                 expected_temp = get_expected_temperature(
                     state.temperature_curves, 
@@ -214,22 +226,9 @@ try:
                 )
                 state.temperature_expected_var.set(f"{expected_temp:.2f}")
             except Exception as e: 
-                print(f"Error getting expected temperature: {e}")  
+                print(f"Error getting expected temperature: {e}")
 
-            on_delay_sek = state.on_delay / 1000    
-            # Sterowanie triakiem
-            if on_delay_sek > 0: 
-                state.ssr.on()
-                state.led_indicator.turn_on()
-                state.root.update()
-                time.sleep(on_delay_sek)
-                state.ssr.off()
-                state.led_indicator.turn_off()
-                state.root.update()
-
-            state.update_time()
-
-            
+            # Aktualizacja danych PZEM
             try: 
                 update_pzem_data(
                     state.pzem, 
@@ -241,42 +240,56 @@ try:
                     state.cycle_var
                 )
             except Exception as e: 
-                print(f"Error updating PZEM data: {e}")   
+                print(f"Error updating PZEM data: {e}")
 
+            # Odświeżenie GUI
+            state.root.update_idletasks()
+            state.root.update()
 
-            # Aktualizacja wykresu
+        # Aktualizacja wykresu co 500ms
+        if current_time - last_plot_update >= 0.5:
+            last_plot_update = current_time
             try:
                 if state.temp_plot:
                     actual = float(state.temperature_approximate_var.get())
-                    expected = float(state.temperature_expected_var.get())
                     if state.temperature_schedule and 'points' in state.temperature_schedule:
-                        # Znajdź maksymalny czas w harmonogramie
                         max_time = max(time_to_seconds(point['time']) for point in state.temperature_schedule['points'])
                         if state.elapsed_time <= max_time:
-                            actual = float(state.temperature_approximate_var.get())
                             state.temp_plot.update_plot(state.elapsed_time, actual)
             except Exception as e:
                 print(f"Error updating plot: {e}")
 
-            
-            # Zapis danych do CSV
-            state.csv_logger.write_data([
-                time.strftime("%Y-%m-%d %H:%M:%S"),
-                state.elapsed_time,
-                state.temperature_thermocouple_var.get(),
-                state.temperature_approximate_var.get(),
-                state.temperature_expected_var.get(),
-                state.voltage_var.get(),
-                state.current_var.get(),
-                state.power_var.get(),
-                state.energy_var.get(),
-                state.freq_var.get(),
-                state.cycle_var.get()
-            ])
-            
-            # Odświeżenie GUI Tkinter
-            state.root.update_idletasks()
-            state.root.update()
+        # Zapis do CSV co 1 sekundę
+        if current_time - last_csv_update >= 1.0:
+            last_csv_update = current_time
+            try:
+                state.csv_logger.write_data([
+                    time.strftime("%Y-%m-%d %H:%M:%S"),
+                    state.elapsed_time,
+                    state.temperature_thermocouple_var.get(),
+                    state.temperature_approximate_var.get(),
+                    state.temperature_expected_var.get(),
+                    state.voltage_var.get(),
+                    state.current_var.get(),
+                    state.power_var.get(),
+                    state.energy_var.get(),
+                    state.freq_var.get(),
+                    state.cycle_var.get()
+                ])
+            except Exception as e:
+                print(f"Error writing to CSV: {e}")
+
+        # Sterowanie triakiem
+        on_delay_sek = state.on_delay / 1000    
+        if on_delay_sek > 0: 
+            state.ssr.on()
+            state.led_indicator.turn_on()
+            time.sleep(on_delay_sek)
+            state.ssr.off()
+            state.led_indicator.turn_off()
+
+        state.update_time()
+        time.sleep(0.01)  # Dodaj małe opóźnienie, aby zmniejszyć obciążenie CPU
 
 except KeyboardInterrupt:
     state.ssr.off()

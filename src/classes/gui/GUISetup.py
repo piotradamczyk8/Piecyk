@@ -15,7 +15,8 @@ class GUISetup:
                  temperature_approximate_var: tk.StringVar, temperature_expected_var: tk.StringVar,
                  temperature_ir_var: tk.StringVar, bottom_cover_temperature: tk.StringVar,
                  humidity: tk.StringVar, progres_var_percent: tk.StringVar,
-                 curve_description: str = ""):
+                 curve_description: str = "", hours_var: tk.StringVar = None,
+                 minutes_var: tk.StringVar = None):
         self.root = root
         self.curve_var = curve_var
         self.progress_var = progress_var
@@ -37,6 +38,8 @@ class GUISetup:
         self.progres_var_percent = progres_var_percent
         self.curve_description_var = tk.StringVar(master=self.root, value=curve_description)
         self.initial_time_var = tk.StringVar(master=self.root, value="00:00")
+        self.hours_var = hours_var
+        self.minutes_var = minutes_var
 
         self.frame: Optional[tk.Frame] = None
         self.temp_plot = None
@@ -100,33 +103,30 @@ class GUISetup:
         tk.Label(initial_time_frame, text="Initial Time:").pack(side=tk.LEFT)
         
         # Spinbox dla godzin
-        self.hours_var = tk.StringVar(value="00")
         self.hours_spinbox = tk.Spinbox(
             initial_time_frame,
             from_=0,
             to=23,
             width=2,
             format="%02.0f",
-            textvariable=self.hours_var,
-            command=lambda: self.update_time(set_initial_time)
+            textvariable=self.hours_var
         )
         self.hours_spinbox.pack(side=tk.LEFT, padx=2)
         
         tk.Label(initial_time_frame, text=":").pack(side=tk.LEFT)
         
         # Spinbox dla minut
-        self.minutes_var = tk.StringVar(value="00")
         self.minutes_spinbox = tk.Spinbox(
             initial_time_frame,
             from_=0,
             to=59,
             width=2,
             format="%02.0f",
-            textvariable=self.minutes_var,
-            command=lambda: self.update_time(set_initial_time)
+            textvariable=self.minutes_var
         )
         self.minutes_spinbox.pack(side=tk.LEFT, padx=2)
 
+        tk.Button(initial_time_frame, text="SET", command=set_initial_time).pack(side=tk.LEFT, padx=5)
 
         # Frame for curve description
         description_frame = tk.Frame(controls_frame)

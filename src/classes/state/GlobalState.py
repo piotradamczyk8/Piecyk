@@ -55,6 +55,8 @@ class GlobalState:
         self.progres_var_percent = None
         self.curve_description_var = None
         self.curve_description = None
+        self.hours_var = None
+        self.minutes_var = None
         # Zmienne stanu
         self.temp_plot = None
         self.progress_bar = None
@@ -133,6 +135,8 @@ class GlobalState:
             self.progres_var_percent = tk.StringVar(master=self.root, value="0")
             self.curve_description_var = tk.StringVar(master=self.root, value="")
             self.curve_description = tk.StringVar(master=self.root, value="")
+            self.hours_var = tk.StringVar(master=self.root, value="00")
+            self.minutes_var = tk.StringVar(master=self.root, value="00")
 
             # Utwórz wskaźnik LED
             self.led_indicator = LEDIndicator(self.root)
@@ -168,7 +172,9 @@ class GlobalState:
             'temperature_approximate_var': self.temperature_approximate_var,
             'progres_var_percent': self.progres_var_percent,
             'curve_description_var': self.curve_description_var,
-            'curve_description': self.curve_description
+            'curve_description': self.curve_description,
+            'hours_var': self.hours_var,
+            'minutes_var': self.minutes_var
         }
         
     def update_time(self):

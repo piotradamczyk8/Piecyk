@@ -48,7 +48,7 @@ class GUIController:
         """Ustawia początkowy czas dla harmonogramu."""
         try:
             # Pobierz wartość z pola tekstowego i przekonwertuj na sekundy
-            time_str = self.state.initial_time_var.get()
+            time_str = f"{self.state.hours_var.get()}:{self.state.minutes_var.get()}"
             self.state.add_time = time_to_seconds(time_str)
             print(f"Ustawiono początkowy czas: {time_str} ({self.state.add_time} sekund)")
             
