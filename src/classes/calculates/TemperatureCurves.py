@@ -39,6 +39,7 @@ class TemperatureCurves:
             self._curves_names = []
             return
 
+        # Wczytaj tylko nazwy plików bez rozszerzenia
         self._curves_names = [
             os.path.splitext(filename)[0]
             for filename in os.listdir(self.curves_dir)
@@ -46,7 +47,7 @@ class TemperatureCurves:
         ]
 
     def _load_curve(self, name: str) -> Optional[Dict]:
-        """Wczytuje pojedynczą krzywą z pliku."""
+        """Wczytuje pojedynczą krzywą z pliku tylko gdy jest potrzebna."""
         if name in self._curves_cache:
             return self._curves_cache[name]
 
@@ -68,12 +69,13 @@ class TemperatureCurves:
             print(f"Błąd podczas wczytywania krzywej {filename}: {e}")
             return None
 
-    def get_curves(self) -> List[str]:
+    @property
+    def curves(self) -> List[str]:
         """Zwraca listę dostępnych krzywych."""
         return self._curves_names
 
     def get_curve(self, name: str) -> Optional[Dict]:
-        """Zwraca krzywą o podanej nazwie."""
+        """Zwraca krzywą o podanej nazwie, wczytując ją jeśli nie jest w cache."""
         return self._load_curve(name)
 
     def _time_to_seconds(self, time_str: str) -> int:

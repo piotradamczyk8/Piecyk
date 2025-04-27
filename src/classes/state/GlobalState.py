@@ -93,7 +93,7 @@ class GlobalState:
         self.global_file = None
         
         # Inicjalizacja dodatkowych wartości
-        self.curves = self.temperature_curves.get_curves()
+        self.curves = self.temperature_curves.curves
         self.description = self.temperature_curves.get_curve_stage("Bisquit", "01:36:02")
         
         # Inicjalizacja GUI jeśli wymagana

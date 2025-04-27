@@ -199,6 +199,19 @@ try:
             except Exception as e: 
                 print(f"Error updating PID: {e}")
 
+            # Aktualizacja stanu SSR i kontrolki LED
+            try:
+                if state.on_delay > 0:
+                    state.ssr.on()
+                    if state.led_indicator:
+                        state.led_indicator.turn_on()
+                else:
+                    state.ssr.off()
+                    if state.led_indicator:
+                        state.led_indicator.turn_off()
+            except Exception as e:
+                print(f"Error updating SSR and LED state: {e}")
+
             # Aktualizacja etykiet czasu
             try:
                 update_time(
@@ -278,15 +291,6 @@ try:
                 ])
             except Exception as e:
                 print(f"Error writing to CSV: {e}")
-
-        # Sterowanie triakiem
-        on_delay_sek = state.on_delay / 1000    
-        if on_delay_sek > 0: 
-            state.ssr.on()
-            state.led_indicator.turn_on()
-            time.sleep(on_delay_sek)
-            state.ssr.off()
-            state.led_indicator.turn_off()
 
         state.update_time()
         time.sleep(0.01)  # Dodaj małe opóźnienie, aby zmniejszyć obciążenie CPU
