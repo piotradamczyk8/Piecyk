@@ -32,6 +32,11 @@ class TemperaturePlot:
         self.info_box.set_visible(False)
         self.info_text.set_visible(False)
 
+        # Tekst z aktualnymi wartościami
+        self.current_values_text = self.ax.text(0, 0, '', fontsize=8, ha='left', va='bottom',
+                                              bbox=dict(facecolor='white', edgecolor='black', alpha=0.8))
+        self.current_values_text.set_visible(True)
+
         # Linie podziału i opisy sekcji
         self.section_lines = []
         self.section_texts = []
@@ -148,8 +153,34 @@ class TemperaturePlot:
             self.drag_current_x = xdata
             # Aktualizuj tylko pozycję linii
             self.line_current.set_xdata([xdata, xdata])
-            # Odśwież tylko linię
+            
+            # Znajdź najbliższą temperaturę docelową
+            target_temp = 0
+            for i in range(len(self.profile_times) - 1):
+                if self.profile_times[i] <= xdata <= self.profile_times[i + 1]:
+                    # Interpoluj temperaturę
+                    t1, t2 = self.profile_times[i], self.profile_times[i + 1]
+                    temp1, temp2 = self.profile_temps[i], self.profile_temps[i + 1]
+                    target_temp = temp1 + (temp2 - temp1) * (xdata - t1) / (t2 - t1)
+                    break
+            
+            # Znajdź najbliższą temperaturę rzeczywistą
+            actual_temp = 0
+            if self.time_data and self.temp_actual_data:
+                for i in range(len(self.time_data) - 1):
+                    if self.time_data[i] <= xdata <= self.time_data[i + 1]:
+                        # Interpoluj temperaturę
+                        t1, t2 = self.time_data[i], self.time_data[i + 1]
+                        temp1, temp2 = self.temp_actual_data[i], self.temp_actual_data[i + 1]
+                        actual_temp = temp1 + (temp2 - temp1) * (xdata - t1) / (t2 - t1)
+                        break
+            
+            # Aktualizuj wyświetlane wartości
+            self.update_current_values(xdata, target_temp, actual_temp)
+            
+            # Odśwież tylko linię i tekst
             self.ax.draw_artist(self.line_current)
+            self.ax.draw_artist(self.current_values_text)
             self.canvas.blit(self.ax.bbox)
 
     def update_time_from_line(self, xdata):
@@ -189,12 +220,30 @@ class TemperaturePlot:
             # Dodaj nowe dane
             self.time_data.append(elapsed_time)
             self.temp_actual_data.append(actual_temp)
-            self.ax.plot(self.time_data, self.temp_actual_data)
+            
+            # Aktualizuj linię z rzeczywistą temperaturą
+            self.line_actual.set_data(self.time_data, self.temp_actual_data)
             
             # Aktualizuj pionową linię czasu
-            max_temp = max(self.temp_actual_data)
-            self.line_current.set_data([elapsed_time, elapsed_time], [0, max_temp])
-   
+            y_min, y_max = self.ax.get_ylim()
+            self.line_current.set_data([elapsed_time, elapsed_time], [y_min, y_max])
+            
+            # Znajdź najbliższą temperaturę docelową
+            target_temp = 0
+            for i in range(len(self.profile_times) - 1):
+                if self.profile_times[i] <= elapsed_time <= self.profile_times[i + 1]:
+                    # Interpoluj temperaturę
+                    t1, t2 = self.profile_times[i], self.profile_times[i + 1]
+                    temp1, temp2 = self.profile_temps[i], self.profile_temps[i + 1]
+                    target_temp = temp1 + (temp2 - temp1) * (elapsed_time - t1) / (t2 - t1)
+                    break
+            
+            # Aktualizuj wyświetlane wartości
+            self.update_current_values(elapsed_time, target_temp, actual_temp)
+            
+            # Odśwież wykres
+            self.canvas.draw()
+            self.canvas.flush_events()
             
         except Exception as e:
             print(f"Błąd przy aktualizacji wykresu: {e}")
@@ -336,3 +385,32 @@ class TemperaturePlot:
         self.section_lines = []
         self.section_texts = []
         self.sections = {} 
+
+    def update_current_values(self, current_time, target_temp, actual_temp):
+        """Aktualizuje wyświetlane wartości przy czerwonej linii."""
+        # Konwertuj czas na format HH:MM
+        hours = int(current_time // 3600)
+        minutes = int((current_time % 3600) // 60)
+        time_str = f"{hours:02d}:{minutes:02d}"
+        
+        # Formatuj tekst z wartościami
+        text = f"Time: {time_str}\nTarget: {target_temp:.1f}°C\nActual: {actual_temp:.1f}°C"
+        
+        # Ustaw pozycję tekstu
+        x_pos = current_time
+        y_pos = max(target_temp, actual_temp) + 10  # 10 stopni powyżej wyższej temperatury
+        
+        # Ogranicz pozycję do zakresu wykresu
+        x_lim = self.ax.get_xlim()
+        y_lim = self.ax.get_ylim()
+        x_pos = max(x_lim[0] + 0.05 * (x_lim[1] - x_lim[0]), 
+                   min(x_lim[1] - 0.05 * (x_lim[1] - x_lim[0]), x_pos))
+        y_pos = max(y_lim[0] + 0.05 * (y_lim[1] - y_lim[0]), 
+                   min(y_lim[1] - 0.05 * (y_lim[1] - y_lim[0]), y_pos))
+        
+        # Aktualizuj tekst i pozycję
+        self.current_values_text.set_text(text)
+        self.current_values_text.set_position((x_pos, y_pos))
+        
+        # Odśwież wykres
+        self.canvas.draw() 
