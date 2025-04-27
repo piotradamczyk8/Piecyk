@@ -199,59 +199,99 @@ class TemperaturePlot:
         except Exception as e:
             print(f"Błąd przy aktualizacji wykresu: {e}")
 
-    def draw_expected_profile(self, schedule):
-        """Rysuje cały oczekiwany profil temperatury na podstawie harmonogramu."""
-        # Sprawdź czy schedule zawiera klucz 'points'
-        if not isinstance(schedule, dict) or 'points' not in schedule:
-            print("Nieprawidłowy format harmonogramu")
-            return
+    def temperature_to_color(self, temp):
+        """Konwertuje temperaturę na kolor RGB.
         
-        # Konwersja godzin na sekundy
-        schedule_seconds = {}
-        for point in schedule['points']:
-            time_str = point['time']
-            hours, minutes = map(int, time_str.split(':'))
-            seconds = hours * 3600 + minutes * 60
-            try:
-                schedule_seconds[seconds] = float(point['temperature'])
-            except (ValueError, TypeError):
-                print(f"Błąd konwersji temperatury na float: {point['temperature']}")
-                continue
+        Kolory zmieniają się następująco:
+        - 30°C: czarny (0, 0, 0)
+        - 400°C: ciemny czerwony (0.5, 0, 0)
+        - 800°C: pomarańczowy (1, 0.5, 0)
+        - 1000°C: jasny pomarańczowy (1, 0.7, 0)
+        - >1000°C: żółty (1, 1, 0)
+        """
+        # Normalizuj temperaturę do zakresu 0-1
+        # Zakładamy, że temperatura zmienia się od 30 do 1200°C
+        normalized_temp = min(max((temp - 30) / (1200 - 30), 0.0), 1.0)
         
-        if not schedule_seconds:
-            print("Brak prawidłowych punktów w harmonogramie")
-            return
+        if normalized_temp < 0.33:  # 30-400°C
+            # Od czarnego do ciemnego czerwonego
+            r = normalized_temp * 1.5
+            g = 0
+            b = 0
+        elif normalized_temp < 0.66:  # 400-800°C
+            # Od ciemnego czerwonego do pomarańczowego
+            r = 1
+            g = (normalized_temp - 0.33) * 1.5
+            b = 0
+        else:  # 800-1200°C
+            # Od pomarańczowego do żółtego
+            r = 1
+            g = 0.5 + (normalized_temp - 0.66) * 1.5
+            b = 0
             
-        self.profile_times = sorted(schedule_seconds.keys())
-        self.profile_temps = [schedule_seconds[t] for t in self.profile_times]
+        return (r, g, b)
 
-        # Ustawienie danych dla linii profilu
-        self.line_profile.set_data(self.profile_times, self.profile_temps)
-
-        # Ustawienie limitów osi Y na podstawie profilu + margines
-        if self.profile_temps:
-            min_temp = min(self.profile_temps)
-            max_temp = max(self.profile_temps)
-            margin = (max_temp - min_temp) * 0.1
-            self.ax.set_ylim(bottom=min_temp - margin, top=max_temp + margin)
-
-        # Ustawienie limitu osi X na podstawie maksymalnego czasu profilu
-        if self.profile_times:
-            self.ax.set_xlim(left=0, right=max(self.profile_times) * 1.05)
-
-        # Wyczyść dane bieżące przy zmianie profilu
-        self.time_data = []
-        self.temp_actual_data = []
-        self.line_actual.set_data([], [])
-        if hasattr(self, 'line_current'):
-            self.line_current.remove()
-            self.line_current = self.ax.axvline(x=0, color='r', linestyle='-', linewidth=2, picker=5)
-
-        self.ax.legend()
-        self.canvas.draw()
-        self.canvas.flush_events()
-        self.canvas_widget.update_idletasks()
-        self.canvas_widget.update()
+    def draw_expected_profile(self, schedule):
+        """Rysuje profil temperatury z harmonogramu."""
+        try:
+            if not schedule or 'points' not in schedule:
+                return
+                
+            # Wyczyść poprzedni profil
+            self.profile_times = []
+            self.profile_temps = []
+            
+            # Zbierz punkty z harmonogramu
+            for point in schedule['points']:
+                time_str = point['time']
+                hours, minutes = map(int, time_str.split(':'))
+                seconds = hours * 3600 + minutes * 60
+                temp = float(point['temperature'])
+                
+                self.profile_times.append(seconds)
+                self.profile_temps.append(temp)
+            
+            # Rysuj profil z kolorowymi punktami
+            for i in range(len(self.profile_times) - 1):
+                # Oblicz liczbę punktów pośrednich (co 2.5 minuty)
+                time_diff = self.profile_times[i + 1] - self.profile_times[i]
+                temp_diff = self.profile_temps[i + 1] - self.profile_temps[i]
+                num_points = max(2, int(time_diff / 150))  # Co najmniej 2 punkty, co 2.5 minuty
+                
+                # Generuj punkty pośrednie
+                times = np.linspace(self.profile_times[i], self.profile_times[i + 1], num_points)
+                temps = np.linspace(self.profile_temps[i], self.profile_temps[i + 1], num_points)
+                
+                # Rysuj punkty z kolorami odpowiadającymi temperaturze
+                for t, temp in zip(times, temps):
+                    color = self.temperature_to_color(temp)
+                    self.ax.plot(
+                        t,
+                        temp,
+                        '.',
+                        color=color,
+                        markersize=1
+                    )
+            
+            # Rysuj ostatni punkt
+            color = self.temperature_to_color(self.profile_temps[-1])
+            self.ax.plot(
+                self.profile_times[-1],
+                self.profile_temps[-1],
+                '.',
+                color=color,
+                markersize=1
+            )
+            
+            # Ustaw zakres osi
+            if self.profile_times:
+                self.ax.set_xlim(0, max(self.profile_times))
+                self.ax.set_ylim(0, max(self.profile_temps) * 1.1)
+            
+            self.canvas.draw()
+            
+        except Exception as e:
+            print(f"Błąd przy rysowaniu profilu: {e}")
 
     def set_title(self, title: str):
         """Ustawia tytuł wykresu."""
