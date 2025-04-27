@@ -1,66 +1,66 @@
 {
     "name": "Glazing perfect",
-    "description": "Idealna krzywa wypału szkliwa",
+    "description": "Ideal glaze firing curve",
     "points": [
         {
             "time": "00:00",
             "temperature": 30,
-            "stage": "Początek wypału"
+            "stage": "Start of firing"
         },
         {
             "time": "01:00",
             "temperature": 200,
-            "stage": "Podgrzewanie"
+            "stage": "Preheating"
         },
         {
             "time": "02:00",
             "temperature": 500,
-            "stage": "Wypalanie wody"
+            "stage": "Water smoking"
         },
         {
             "time": "03:00",
             "temperature": 600,
-            "stage": "Wypalanie materii organicznej"
+            "stage": "Organic matter burning"
         },
         {
             "time": "04:00",
             "temperature": 750,
-            "stage": "Wypalanie węgla"
+            "stage": "Carbon burning"
         },
         {
             "time": "05:00",
             "temperature": 900,
-            "stage": "Wypalanie szkliwa"
+            "stage": "Glaze firing"
         },
         {
             "time": "06:00",
             "temperature": 1050,
-            "stage": "Wypalanie szkliwa"
+            "stage": "Glaze firing"
         },
         {
             "time": "06:15",
             "temperature": 1050,
-            "stage": "Wygrzewanie"
+            "stage": "Soaking"
         },
         {
             "time": "07:00",
             "temperature": 850,
-            "stage": "Schładzanie"
+            "stage": "Cooling"
         },
         {
             "time": "08:00",
             "temperature": 600,
-            "stage": "Schładzanie"
+            "stage": "Cooling"
         },
         {
             "time": "09:00",
             "temperature": 500,
-            "stage": "Schładzanie"
+            "stage": "Cooling"
         },
         {
             "time": "10:00",
             "temperature": 30,
-            "stage": "Koniec wypału"
+            "stage": "End of firing"
         }
     ]
 } 
