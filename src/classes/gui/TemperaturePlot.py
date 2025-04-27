@@ -386,12 +386,20 @@ class TemperaturePlot:
             all_temps = []
             all_colors = []
             
+            # Ustaw początkowy zakres osi
+            if self.profile_times:
+                self.ax.set_xlim(0, max(self.profile_times))
+                self.ax.set_ylim(0, max(self.profile_temps) * 1.1)
+            
+            # Oblicz liczbę punktów na podstawie stałej wartości
+            POINTS_PER_HOUR = 3600  # Jeden punkt na sekundę
+            
             for i in range(len(self.profile_times) - 1):
-                time_diff = self.profile_times[i + 1] - self.profile_times[i]
-                num_points = max(2, int(time_diff / 150))  # Co najmniej 2 punkty, co 2.5 minuty
+                time_range = self.profile_times[i + 1] - self.profile_times[i]
+                points_per_segment = max(2, int(time_range))
                 
-                times = np.linspace(self.profile_times[i], self.profile_times[i + 1], num_points)
-                temps = np.linspace(self.profile_temps[i], self.profile_temps[i + 1], num_points)
+                times = np.linspace(self.profile_times[i], self.profile_times[i + 1], points_per_segment)
+                temps = np.linspace(self.profile_temps[i], self.profile_temps[i + 1], points_per_segment)
                 
                 all_times.extend(times)
                 all_temps.extend(temps)
@@ -413,16 +421,13 @@ class TemperaturePlot:
             # Narysuj wszystkie punkty na raz
             self.profile_scatter = self.ax.scatter(all_times, all_temps, c=all_colors, s=1, marker='.')
             
-            # Ustaw zakres osi
-            if self.profile_times:
-                self.ax.set_xlim(0, max(self.profile_times))
-                self.ax.set_ylim(0, max(self.profile_temps) * 1.1)
-            
             # Odśwież cały wykres
             self.canvas.draw()
             
         except Exception as e:
             print(f"Błąd przy rysowaniu profilu: {e}")
+            import traceback
+            traceback.print_exc()
 
     def set_title(self, title: str):
         """Ustawia tytuł wykresu."""

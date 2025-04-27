@@ -14,11 +14,21 @@
         },
         {
             "time": "02:15",
-            "temperature": 1030,
-            "stage": "Glaze firing"
+            "temperature": 1050,
+            "stage": "Holding"
+        },
+        {
+            "time": "02:30",
+            "temperature": 1050,
+            "stage": "Holding"
         },
         {
             "time": "03:00",
+            "temperature": 850,
+            "stage": "Cooling down"
+        },
+        {
+            "time": "04:00",
             "temperature": 30,
             "stage": "End of firing"
         }
