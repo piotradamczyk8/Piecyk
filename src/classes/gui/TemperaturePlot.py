@@ -303,12 +303,8 @@ class TemperaturePlot:
                 self.last_target_temp = target_temp
                 self.update_current_values(elapsed_time, target_temp, actual_temp)
             
-            # Odśwież tylko linię i tekst
-            if (hasattr(self, 'line_current') and self.line_current is not None and 
-                hasattr(self, 'current_values_text') and self.current_values_text is not None):
-                self.ax.draw_artist(self.line_current)
-                self.ax.draw_artist(self.current_values_text)
-                self.canvas.blit(self.ax.bbox)
+            # Odśwież cały wykres
+            self.canvas.draw()
             
         except Exception as e:
             print(f"Błąd przy aktualizacji wykresu: {e}")
@@ -422,9 +418,8 @@ class TemperaturePlot:
                 self.ax.set_xlim(0, max(self.profile_times))
                 self.ax.set_ylim(0, max(self.profile_temps) * 1.1)
             
-            # Odśwież tylko niezbędne elementy
-            self.ax.draw_artist(self.ax)
-            self.canvas.blit(self.ax.bbox)
+            # Odśwież cały wykres
+            self.canvas.draw()
             
         except Exception as e:
             print(f"Błąd przy rysowaniu profilu: {e}")
@@ -432,8 +427,7 @@ class TemperaturePlot:
     def set_title(self, title: str):
         """Ustawia tytuł wykresu."""
         self.ax.set_title(title)
-        self.ax.draw_artist(self.ax)
-        self.canvas.blit(self.ax.bbox)
+        self.canvas.draw()
 
     def add_section(self, start_time: int, end_time: int, name: str, description: str):
         """Dodaje nową sekcję na wykresie."""
@@ -503,9 +497,8 @@ class TemperaturePlot:
             self.current_values_text.set_text(text)
             self.current_values_text.set_position((x_pos, y_pos))
             
-            # Odśwież tylko tekst
-            self.ax.draw_artist(self.current_values_text)
-            self.canvas.blit(self.ax.bbox)
+            # Odśwież cały wykres
+            self.canvas.draw()
             
         except Exception as e:
             print(f"Błąd przy aktualizacji wartości: {e}") 
