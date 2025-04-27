@@ -18,12 +18,14 @@ class TemperaturePlot:
         self.ax.set_xlabel("Time (HH:MM)")
         self.ax.set_ylabel("Temperature (°C)")
 
-        # Lines for expected and actual temperature        
-        self.line_actual, = self.ax.plot([], [], 'b-', label='Actual')
-        # Line for the entire profile
-        self.line_profile, = self.ax.plot([], [], 'g:', label='Profile')
-        # Vertical line for current point
-        self.line_current = self.ax.axvline(x=0, color='r', linestyle='-', linewidth=2, label='Current point', picker=5)
+        # Inicjalizacja danych
+        self.time_data = [0]
+        self.temp_actual_data = [0]
+        self.profile_times = []
+        self.profile_temps = []
+        
+        # Inicjalizacja linii
+        self._init_lines()
         
         # Okienko z informacjami
         self.info_box = Rectangle((0, 0), 0.1, 0.1, facecolor='white', edgecolor='black', alpha=0.8)
@@ -70,12 +72,6 @@ class TemperaturePlot:
         self.canvas_widget = self.canvas.get_tk_widget()
         self.canvas_widget.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
 
-        # Dane do wykresu
-        self.time_data = []
-        self.temp_actual_data = []
-        self.profile_times = []
-        self.profile_temps = []
-
         # Zmienne do przeciągania linii
         self.dragging = False
         self.drag_start_x = 0
@@ -84,9 +80,21 @@ class TemperaturePlot:
         # Zmienne do optymalizacji wykresu
         self.max_points = 1000  # Maksymalna liczba punktów na wykresie
         self.last_draw_time = 0  # Czas ostatniego rysowania
-        self.draw_interval = 0.1  # Interwał rysowania w sekundach
+        self.draw_interval = 0.5  # Interwał rysowania w sekundach
         self.last_scale_time = 0  # Czas ostatniego skalowania
         self.scale_interval = 1.0  # Interwał skalowania w sekundach
+        
+        # Cache dla ostatnich wartości
+        self.last_elapsed_time = 0
+        self.last_actual_temp = 0
+        self.last_target_temp = 0
+        self.last_update_time = 0
+        self.update_interval = 0.5  # Zwiększamy interwał do 500ms
+        
+        # Cache dla punktów profilu
+        self.profile_points = None
+        self.profile_colors = None
+        self.profile_scatter = None
 
         # Podłącz obsługę zdarzeń myszy
         self.canvas.mpl_connect('button_press_event', self.on_press)
@@ -114,6 +122,26 @@ class TemperaturePlot:
         # Ustawienie zakresu osi
         self.ax.set_xlim(0, 1)
         self.ax.set_ylim(0, 1)
+
+    def _init_lines(self):
+        """Inicjalizuje linie wykresu z początkowymi danymi."""
+        try:
+            # Lines for expected and actual temperature        
+            self.line_actual, = self.ax.plot(self.time_data, self.temp_actual_data, 'b-', label='Actual')
+            # Line for the entire profile
+            self.line_profile, = self.ax.plot([], [], 'g:', label='Profile')
+            # Vertical line for current point
+            self.line_current = self.ax.axvline(x=0, color='r', linestyle='-', linewidth=2, label='Current point', picker=5)
+            
+            # Ustaw początkowy zakres osi
+            self.ax.set_xlim(0, 1)
+            self.ax.set_ylim(0, 1)
+            
+            # Inicjalizuj dane linii
+            self.line_current.set_xdata([0])
+            
+        except Exception as e:
+            print(f"Błąd przy inicjalizacji linii: {e}")
 
     def on_pick(self, event):
         if event.artist == self.line_current:
@@ -152,7 +180,7 @@ class TemperaturePlot:
             xdata = max(0, min(event.xdata, max(self.profile_times)))
             self.drag_current_x = xdata
             # Aktualizuj tylko pozycję linii
-            self.line_current.set_xdata([xdata, xdata])
+            self.line_current.set_xdata([xdata])
             
             # Znajdź najbliższą temperaturę docelową
             target_temp = 0
@@ -184,69 +212,126 @@ class TemperaturePlot:
             self.canvas.blit(self.ax.bbox)
 
     def update_time_from_line(self, xdata):
-        global elapsed_time, start_time, add_time
-        # Ogranicz wartość do zakresu wykresu
-        xdata = max(0, min(xdata, max(self.profile_times)))
-        
-        # Aktualizuj czasy
-        add_time = xdata
-        elapsed_time = xdata
-        start_time = time.time() - xdata
-        
-        # Aktualizuj pole tekstowe
-        hours = int(xdata // 3600)
-        minutes = int((xdata % 3600) // 60)
-        initial_time_var.set(f"{hours:02}:{minutes:02}")
-        
-        # Resetuj dane wykresu
-        self.time_data = []
-        self.temp_actual_data = []
-        self.line_actual.set_data([], [])
-        
-        # Aktualizuj wykres
-        actual = float(temperature_approximate_var.get())
-        self.update_plot(xdata, actual)
-        
-        # Aktualizuj etykiety czasu
-        update_time()
-        
-        print(f"Ustawiono czas z linii: {xdata} sekund ({hours:02}:{minutes:02})")
+        """Aktualizuje czas na podstawie pozycji linii."""
+        try:
+            if not hasattr(self, 'line_current') or self.line_current is None:
+                self._init_lines()
+            
+            # Ogranicz wartość do zakresu wykresu
+            xdata = max(0, min(xdata, max(self.profile_times)))
+            
+            # Aktualizuj czasy
+            self.add_time = xdata
+            self.elapsed_time = xdata
+            self.start_time = time.time() - xdata
+            
+            # Aktualizuj pole tekstowe
+            hours = int(xdata // 3600)
+            minutes = int((xdata % 3600) // 60)
+            self.initial_time_var.set(f"{hours:02}:{minutes:02}")
+            
+            # Resetuj dane wykresu z początkowym punktem
+            self.time_data = [xdata]
+            self.temp_actual_data = [float(self.temperature_approximate_var.get())]
+            
+            # Aktualizuj linię z rzeczywistą temperaturą
+            if hasattr(self, 'line_actual') and self.line_actual is not None:
+                self.line_actual.set_data(self.time_data, self.temp_actual_data)
+            
+            # Aktualizuj pionową linię czasu
+            if hasattr(self, 'line_current') and self.line_current is not None:
+                self.line_current.set_xdata([xdata])
+            
+            # Aktualizuj wykres
+            actual = float(self.temperature_approximate_var.get())
+            self.update_plot(xdata, actual)
+            
+            # Aktualizuj etykiety czasu
+            self.update_time()
+            
+            print(f"Ustawiono czas z linii: {xdata} sekund ({hours:02}:{minutes:02})")
+            
+        except Exception as e:
+            print(f"Błąd przy aktualizacji czasu z linii: {e}")
+            # Dodatkowe informacje o błędzie
+            print(f"xdata: {xdata}")
+            print(f"time_data: {self.time_data}")
+            print(f"temp_actual_data: {self.temp_actual_data}")
+            print(f"profile_times: {self.profile_times}")
 
     def update_plot(self, elapsed_time, actual_temp):
         """Aktualizuje wykres z nowymi danymi."""
         try:
-            self.last_draw_time = time.time()
+            current_time = time.time()
+            
+            # Sprawdź czy minął wystarczający czas od ostatniej aktualizacji
+            if current_time - self.last_update_time < self.update_interval:
+                return
+                
+            self.last_update_time = current_time
+            
+            # Sprawdź czy wartości się znacząco zmieniły
+            if (abs(elapsed_time - self.last_elapsed_time) < 1 and 
+                abs(actual_temp - self.last_actual_temp) < 0.1):
+                return
+                
+            self.last_elapsed_time = elapsed_time
+            self.last_actual_temp = actual_temp
             
             # Dodaj nowe dane
             self.time_data.append(elapsed_time)
             self.temp_actual_data.append(actual_temp)
             
-            # Aktualizuj linię z rzeczywistą temperaturą
-            self.line_actual.set_data(self.time_data, self.temp_actual_data)
+            # Ogranicz liczbę punktów na wykresie
+            if len(self.time_data) > self.max_points:
+                self.time_data = self.time_data[-self.max_points:]
+                self.temp_actual_data = self.temp_actual_data[-self.max_points:]
             
-            # Aktualizuj pionową linię czasu
-            y_min, y_max = self.ax.get_ylim()
-            self.line_current.set_data([elapsed_time, elapsed_time], [y_min, y_max])
+            # Aktualizuj linię z rzeczywistą temperaturą
+            if hasattr(self, 'line_actual') and self.line_actual is not None:
+                self.line_actual.set_data(self.time_data, self.temp_actual_data)
+            
+            # Aktualizuj tylko położenie X czerwonej linii
+            if hasattr(self, 'line_current') and self.line_current is not None:
+                self.line_current.set_xdata([elapsed_time])
             
             # Znajdź najbliższą temperaturę docelową
-            target_temp = 0
-            for i in range(len(self.profile_times) - 1):
-                if self.profile_times[i] <= elapsed_time <= self.profile_times[i + 1]:
-                    # Interpoluj temperaturę
-                    t1, t2 = self.profile_times[i], self.profile_times[i + 1]
-                    temp1, temp2 = self.profile_temps[i], self.profile_temps[i + 1]
-                    target_temp = temp1 + (temp2 - temp1) * (elapsed_time - t1) / (t2 - t1)
-                    break
+            target_temp = self._find_target_temp(elapsed_time)
             
-            # Aktualizuj wyświetlane wartości
-            self.update_current_values(elapsed_time, target_temp, actual_temp)
+            # Aktualizuj wyświetlane wartości tylko jeśli się znacząco zmieniły
+            if abs(target_temp - self.last_target_temp) >= 0.1:
+                self.last_target_temp = target_temp
+                self.update_current_values(elapsed_time, target_temp, actual_temp)
             
-            # Odśwież wykres
-            self.canvas.draw()
-            self.canvas.flush_events()
+            # Odśwież tylko linię i tekst
+            if (hasattr(self, 'line_current') and self.line_current is not None and 
+                hasattr(self, 'current_values_text') and self.current_values_text is not None):
+                self.ax.draw_artist(self.line_current)
+                self.ax.draw_artist(self.current_values_text)
+                self.canvas.blit(self.ax.bbox)
             
         except Exception as e:
             print(f"Błąd przy aktualizacji wykresu: {e}")
+            # Dodatkowe informacje o błędzie
+            print(f"time_data: {self.time_data}")
+            print(f"temp_actual_data: {self.temp_actual_data}")
+            print(f"elapsed_time: {elapsed_time}")
+            print(f"actual_temp: {actual_temp}")
+
+    def _find_target_temp(self, elapsed_time):
+        """Znajduje docelową temperaturę dla danego czasu."""
+        if not self.profile_times:
+            return 0
+            
+        idx = np.searchsorted(self.profile_times, elapsed_time)
+        if idx > 0 and idx < len(self.profile_times):
+            t1, t2 = self.profile_times[idx-1], self.profile_times[idx]
+            temp1, temp2 = self.profile_temps[idx-1], self.profile_temps[idx]
+            return temp1 + (temp2 - temp1) * (elapsed_time - t1) / (t2 - t1)
+        elif idx == 0:
+            return self.profile_temps[0]
+        else:
+            return self.profile_temps[-1]
 
     def temperature_to_color(self, temp):
         """Konwertuje temperaturę na kolor RGB.
@@ -300,44 +385,46 @@ class TemperaturePlot:
                 self.profile_times.append(seconds)
                 self.profile_temps.append(temp)
             
-            # Rysuj profil z kolorowymi punktami
+            # Przygotuj wszystkie punkty i kolory
+            all_times = []
+            all_temps = []
+            all_colors = []
+            
             for i in range(len(self.profile_times) - 1):
-                # Oblicz liczbę punktów pośrednich (co 2.5 minuty)
                 time_diff = self.profile_times[i + 1] - self.profile_times[i]
-                temp_diff = self.profile_temps[i + 1] - self.profile_temps[i]
                 num_points = max(2, int(time_diff / 150))  # Co najmniej 2 punkty, co 2.5 minuty
                 
-                # Generuj punkty pośrednie
                 times = np.linspace(self.profile_times[i], self.profile_times[i + 1], num_points)
                 temps = np.linspace(self.profile_temps[i], self.profile_temps[i + 1], num_points)
                 
-                # Rysuj punkty z kolorami odpowiadającymi temperaturze
-                for t, temp in zip(times, temps):
-                    color = self.temperature_to_color(temp)
-                    self.ax.plot(
-                        t,
-                        temp,
-                        '.',
-                        color=color,
-                        markersize=1
-                    )
+                all_times.extend(times)
+                all_temps.extend(temps)
+                all_colors.extend([self.temperature_to_color(temp) for temp in temps])
             
-            # Rysuj ostatni punkt
-            color = self.temperature_to_color(self.profile_temps[-1])
-            self.ax.plot(
-                self.profile_times[-1],
-                self.profile_temps[-1],
-                '.',
-                color=color,
-                markersize=1
-            )
+            # Dodaj ostatni punkt
+            all_times.append(self.profile_times[-1])
+            all_temps.append(self.profile_temps[-1])
+            all_colors.append(self.temperature_to_color(self.profile_temps[-1]))
+            
+            # Zapisz punkty i kolory
+            self.profile_points = np.column_stack((all_times, all_temps))
+            self.profile_colors = all_colors
+            
+            # Usuń poprzedni scatter jeśli istnieje
+            if self.profile_scatter is not None:
+                self.profile_scatter.remove()
+            
+            # Narysuj wszystkie punkty na raz
+            self.profile_scatter = self.ax.scatter(all_times, all_temps, c=all_colors, s=1, marker='.')
             
             # Ustaw zakres osi
             if self.profile_times:
                 self.ax.set_xlim(0, max(self.profile_times))
                 self.ax.set_ylim(0, max(self.profile_temps) * 1.1)
             
-            self.canvas.draw()
+            # Odśwież tylko niezbędne elementy
+            self.ax.draw_artist(self.ax)
+            self.canvas.blit(self.ax.bbox)
             
         except Exception as e:
             print(f"Błąd przy rysowaniu profilu: {e}")
@@ -345,8 +432,8 @@ class TemperaturePlot:
     def set_title(self, title: str):
         """Ustawia tytuł wykresu."""
         self.ax.set_title(title)
-        self.canvas.draw()
-        self.canvas.flush_events()
+        self.ax.draw_artist(self.ax)
+        self.canvas.blit(self.ax.bbox)
 
     def add_section(self, start_time: int, end_time: int, name: str, description: str):
         """Dodaje nową sekcję na wykresie."""
@@ -388,29 +475,37 @@ class TemperaturePlot:
 
     def update_current_values(self, current_time, target_temp, actual_temp):
         """Aktualizuje wyświetlane wartości przy czerwonej linii."""
-        # Konwertuj czas na format HH:MM
-        hours = int(current_time // 3600)
-        minutes = int((current_time % 3600) // 60)
-        time_str = f"{hours:02d}:{minutes:02d}"
-        
-        # Formatuj tekst z wartościami
-        text = f"Time: {time_str}\nTarget: {target_temp:.1f}°C\nActual: {actual_temp:.1f}°C"
-        
-        # Ustaw pozycję tekstu
-        x_pos = current_time
-        y_pos = max(target_temp, actual_temp) + 10  # 10 stopni powyżej wyższej temperatury
-        
-        # Ogranicz pozycję do zakresu wykresu
-        x_lim = self.ax.get_xlim()
-        y_lim = self.ax.get_ylim()
-        x_pos = max(x_lim[0] + 0.05 * (x_lim[1] - x_lim[0]), 
-                   min(x_lim[1] - 0.05 * (x_lim[1] - x_lim[0]), x_pos))
-        y_pos = max(y_lim[0] + 0.05 * (y_lim[1] - y_lim[0]), 
-                   min(y_lim[1] - 0.05 * (y_lim[1] - y_lim[0]), y_pos))
-        
-        # Aktualizuj tekst i pozycję
-        self.current_values_text.set_text(text)
-        self.current_values_text.set_position((x_pos, y_pos))
-        
-        # Odśwież wykres
-        self.canvas.draw() 
+        try:
+            if not self.current_values_text:
+                return
+                
+            # Konwertuj czas na format HH:MM
+            hours = int(current_time // 3600)
+            minutes = int((current_time % 3600) // 60)
+            time_str = f"{hours:02d}:{minutes:02d}"
+            
+            # Formatuj tekst z wartościami
+            text = f"Time: {time_str}\nTarget: {target_temp:.1f}°C\nActual: {actual_temp:.1f}°C"
+            
+            # Ustaw pozycję tekstu
+            x_pos = current_time
+            y_pos = max(target_temp, actual_temp) + 10  # 10 stopni powyżej wyższej temperatury
+            
+            # Ogranicz pozycję do zakresu wykresu
+            x_lim = self.ax.get_xlim()
+            y_lim = self.ax.get_ylim()
+            x_pos = max(x_lim[0] + 0.05 * (x_lim[1] - x_lim[0]), 
+                       min(x_lim[1] - 0.05 * (x_lim[1] - x_lim[0]), x_pos))
+            y_pos = max(y_lim[0] + 0.05 * (y_lim[1] - y_lim[0]), 
+                       min(y_lim[1] - 0.05 * (y_lim[1] - y_lim[0]), y_pos))
+            
+            # Aktualizuj tekst i pozycję
+            self.current_values_text.set_text(text)
+            self.current_values_text.set_position((x_pos, y_pos))
+            
+            # Odśwież tylko tekst
+            self.ax.draw_artist(self.current_values_text)
+            self.canvas.blit(self.ax.bbox)
+            
+        except Exception as e:
+            print(f"Błąd przy aktualizacji wartości: {e}") 

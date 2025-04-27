@@ -164,6 +164,10 @@ state.setup_csv_logger()
 # Inicjalizacja harmonogramu temperatury
 gui_controller.set_temperature_schedule(state.curve_var)
 
+# Inicjalizacja zmiennych
+last_pzem_update = 0
+pzem_update_interval = 1.0  # Aktualizacja co sekundę
+
 try:
     # Główna pętla programu
     state.reset_time()
@@ -200,17 +204,18 @@ try:
                 print(f"Error updating PID: {e}")
 
             # Aktualizacja stanu SSR i kontrolki LED
-            try:
-                if state.on_delay > 0:
-                    state.ssr.on()
-                    if state.led_indicator:
-                        state.led_indicator.turn_on()
-                else:
-                    state.ssr.off()
-                    if state.led_indicator:
-                        state.led_indicator.turn_off()
-            except Exception as e:
-                print(f"Error updating SSR and LED state: {e}")
+            on_delay_sek = state.on_delay / 1000    
+            # Sterowanie triakiem
+            if on_delay_sek > 0: 
+                state.ssr.on()
+                state.led_indicator.turn_on()
+                state.root.update()
+                time.sleep(on_delay_sek)
+                state.ssr.off()
+                state.led_indicator.turn_off()
+                state.root.update()
+
+            state.update_time()
 
             # Aktualizacja etykiet czasu
             try:
@@ -241,39 +246,38 @@ try:
             except Exception as e: 
                 print(f"Error getting expected temperature: {e}")
 
-            # Aktualizacja danych PZEM
-            try: 
-                update_pzem_data(
-                    state.pzem, 
-                    state.voltage_var, 
-                    state.current_var, 
-                    state.power_var, 
-                    state.energy_var, 
-                    state.freq_var, 
-                    state.cycle_var
-                )
-            except Exception as e: 
-                print(f"Error updating PZEM data: {e}")
+            # Aktualizacja danych PZEM co sekundę
+            if current_time - last_pzem_update >= pzem_update_interval:
+                try: 
+                    update_pzem_data(
+                        state.pzem, 
+                        state.voltage_var, 
+                        state.current_var, 
+                        state.power_var, 
+                        state.energy_var, 
+                        state.freq_var, 
+                        state.cycle_var
+                    )
+                    last_pzem_update = current_time
+                except Exception as e: 
+                    print(f"Error updating PZEM data: {e}")
 
             # Odświeżenie GUI
             state.root.update_idletasks()
             state.root.update()
 
-        # Aktualizacja wykresu co 500ms
-        if current_time - last_plot_update >= 0.5:
+        # Aktualizacja wykresu co 10 sekund
+        if current_time - last_plot_update >= 10:
             last_plot_update = current_time
             try:
-                if state.temp_plot:
+                if state.temp_plot and state.temperature_schedule and 'points' in state.temperature_schedule:
                     actual = float(state.temperature_approximate_var.get())
-                    if state.temperature_schedule and 'points' in state.temperature_schedule:
-                        max_time = max(time_to_seconds(point['time']) for point in state.temperature_schedule['points'])
-                        if state.elapsed_time <= max_time:
-                            state.temp_plot.update_plot(state.elapsed_time, actual)
+                    state.temp_plot.update_plot(state.elapsed_time, actual)
             except Exception as e:
                 print(f"Error updating plot: {e}")
 
         # Zapis do CSV co 1 sekundę
-        if current_time - last_csv_update >= 1.0:
+        if current_time - last_csv_update >= 10:
             last_csv_update = current_time
             try:
                 state.csv_logger.write_data([
