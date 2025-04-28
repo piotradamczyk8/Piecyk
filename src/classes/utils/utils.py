@@ -83,13 +83,29 @@ def update_pzem_data(pzem: Any, voltage_var: Any, current_var: Any,
                     power_var: Any, energy_var: Any, freq_var: Any, 
                     cycle_var: Any) -> None:
     """Aktualizuje dane z PZEM-004T."""
-    pzem.read_data()
-    voltage_var.set(f"{pzem.get_voltage():.2f}")
-    current_var.set(f"{pzem.get_current():.2f}")
-    power_var.set(f"{pzem.get_power():.2f}")
-    energy_var.set(f"{pzem.get_energy():}")
-    freq_var.set(f"{pzem.get_frequency():.2f}")
-    cycle_var.set(f"{round(1000/float(pzem.get_frequency()), 2):.2f}")
+    try:
+        # Próba odczytu danych
+        pzem.read_data()
+        
+        # Aktualizacja wartości tylko jeśli odczyt się powiódł
+        voltage_var.set(f"{pzem.get_voltage():.2f}")
+        current_var.set(f"{pzem.get_current():.2f}")
+        power_var.set(f"{pzem.get_power():.2f}")
+        energy_var.set(f"{pzem.get_energy():}")
+        freq_var.set(f"{pzem.get_frequency():.2f}")
+        cycle_var.set(f"{round(1000/float(pzem.get_frequency()), 2):.2f}")
+        
+    except Exception as e:
+        # W przypadku błędu ustawiamy wartości na 0
+        voltage_var.set("0.00")
+        current_var.set("0.00")
+        power_var.set("0.00")
+        energy_var.set("0")
+        freq_var.set("0.00")
+        cycle_var.set("0.00")
+        
+        # Nie wyświetlamy błędu, aby nie zaśmiecać konsoli
+        pass
 
 def update_temperature(thermocouple: Any, temp_calc: Any, 
                       temperature_thermocouple_var: Any, 
@@ -117,9 +133,9 @@ def update_time(elapsed_time: float, temperature_schedule: Dict[str, Any],
     elapsed_time_var.set(f"{hours:02}:{minutes:02}:{seconds:02}")
 
     # Oblicz pozostały czas na podstawie harmonogramu
+    max_time = 0
     if temperature_schedule and 'points' in temperature_schedule:
         # Znajdź maksymalny czas w harmonogramie
-        max_time = 0
         for point in temperature_schedule['points']:
             time_str = point['time']
             hours, minutes = map(int, time_str.split(':'))

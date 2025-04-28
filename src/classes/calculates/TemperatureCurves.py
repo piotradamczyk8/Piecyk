@@ -30,28 +30,57 @@ class TemperatureCurves:
         # Cache dla krzywych
         self._curves_cache = {}
         self._curves_names = None
+        self._curves_files = {}  # Słownik mapujący nazwy krzywych na nazwy plików
         self._load_curves_names()
 
     def _load_curves_names(self) -> None:
-        """Wczytuje tylko nazwy dostępnych krzywych."""
+        """Wczytuje tylko nazwy dostępnych krzywych z plików JSON."""
         if not os.path.exists(self.curves_dir):
             os.makedirs(self.curves_dir)
             self._curves_names = []
             return
 
-        # Wczytaj tylko nazwy plików bez rozszerzenia
-        self._curves_names = [
-            os.path.splitext(filename)[0]
-            for filename in os.listdir(self.curves_dir)
-            if filename.endswith('.json')
-        ]
+        # Wczytaj nazwy z plików JSON
+        self._curves_names = []
+        for filename in os.listdir(self.curves_dir):
+            if filename.endswith('.json'):
+                try:
+                    with open(os.path.join(self.curves_dir, filename), 'r', encoding='utf-8') as f:
+                        curve_data = json.load(f)
+                        if 'name' in curve_data and 'points' in curve_data:
+                            # Znajdź największy czas w krzywej
+                            max_time_seconds = 0
+                            for point in curve_data['points']:
+                                time_seconds = self._time_to_seconds(point['time'])
+                                if time_seconds > max_time_seconds:
+                                    max_time_seconds = time_seconds
+                            
+                            # Konwertuj czas na format HH:MM:SS
+                            hours = max_time_seconds // 3600
+                            minutes = (max_time_seconds % 3600) // 60
+                            seconds = max_time_seconds % 60
+                            duration = f"{hours:02}:{minutes:02}:{seconds:02}"
+                            
+                            # Dodaj czas trwania do nazwy i zapisz mapowanie
+                            display_name = f"{curve_data['name']} ({duration})"
+                            self._curves_names.append(display_name)
+                            self._curves_files[display_name] = filename
+                except Exception as e:
+                    print(f"Błąd podczas wczytywania nazwy krzywej z pliku {filename}: {e}")
+
+        # Sortuj nazwy alfabetycznie
+        self._curves_names.sort()
 
     def _load_curve(self, name: str) -> Optional[Dict]:
         """Wczytuje pojedynczą krzywą z pliku tylko gdy jest potrzebna."""
         if name in self._curves_cache:
             return self._curves_cache[name]
 
-        filename = f"{name}.json"
+        # Znajdź nazwę pliku dla danej krzywej
+        filename = self._curves_files.get(name)
+        if not filename:
+            return None
+
         filepath = os.path.join(self.curves_dir, filename)
         
         if not os.path.exists(filepath):
