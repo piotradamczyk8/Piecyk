@@ -275,39 +275,45 @@ class GUISetup:
         except Exception as e:
             print(f"Błąd przy aktualizacji czasu: {e}") 
 
-    def set_time_to_temp(self):
+    def set_time_to_temp(self) -> None:
         """Ustawia czas na podstawie aktualnej temperatury."""
         try:
             # Pobierz aktualną temperaturę
             current_temp = float(self.temperature_approximate_var.get())
             
-            # Znajdź najbliższy punkt czasowy dla tej temperatury
-            if not self.temp_plot or not self.temp_plot.profile_times or not self.temp_plot.profile_temps:
-                print("Brak danych profilu temperatury")
+            # Pobierz aktualną krzywą
+            curve = self.temperature_curves.get_curve(self.curve_var.get())
+            if not curve:
+                print("Nie znaleziono krzywej")
                 return
-                
-            # Znajdź najbliższy punkt czasowy
-            closest_time = 0
+            
+            # Znajdź najbliższy punkt temperaturowy
+            closest_point = None
             min_diff = float('inf')
             
-            for i in range(len(self.temp_plot.profile_temps)):
-                diff = abs(self.temp_plot.profile_temps[i] - current_temp)
-                if diff < min_diff:
-                    min_diff = diff
-                    closest_time = self.temp_plot.profile_times[i]
+            for point in curve['points']:
+                temp_diff = abs(float(point['temperature']) - current_temp)
+                if temp_diff < min_diff:
+                    min_diff = temp_diff
+                    closest_point = point
             
-            # Konwertuj czas na godziny i minuty
-            hours = int(closest_time // 3600)
-            minutes = int((closest_time % 3600) // 60)
-            
-            # Ustaw wartości w spinboxach
-            self.hours_var.set(f"{hours:02d}")
-            self.minutes_var.set(f"{minutes:02d}")
-            
-            # Wywołaj set_initial_time
-            self.set_initial_time()
-            
-            print(f"Ustawiono czas na podstawie temperatury {current_temp:.1f}°C: {hours:02d}:{minutes:02d}")
+            if closest_point:
+                # Konwertuj czas na godziny i minuty
+                time_str = closest_point['time']
+                hours, minutes = map(int, time_str.split(':'))
+                
+                # Ustaw wartości w spinboxach
+                if self.hours_var:
+                    self.hours_var.set(hours)
+                if self.minutes_var:
+                    self.minutes_var.set(minutes)
+                
+                # Wywołaj set_initial_time
+                self.set_initial_time()
+                
+                print(f"Ustawiono czas na {hours:02}:{minutes:02} dla temperatury {current_temp}°C")
+            else:
+                print("Nie znaleziono odpowiedniego punktu czasowego")
             
         except Exception as e:
-            print(f"Błąd przy ustawianiu czasu na podstawie temperatury: {e}") 
+            print(f"Błąd podczas ustawiania czasu: {e}") 

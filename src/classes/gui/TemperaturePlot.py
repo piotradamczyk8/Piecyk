@@ -340,8 +340,8 @@ class TemperaturePlot:
         - >1000°C: żółty (1, 1, 0)
         """
         # Normalizuj temperaturę do zakresu 0-1
-        # Zakładamy, że temperatura zmienia się od 30 do 1200°C
-        normalized_temp = min(max((temp - 30) / (1200 - 30), 0.0), 1.0)
+        # Zakładamy, że temperatura zmienia się od 30 do 1300°C
+        normalized_temp = min(max((temp - 30) / (1300 - 30), 0.0), 1.0)
         
         if normalized_temp < 0.33:  # 30-400°C
             # Od czarnego do ciemnego czerwonego
@@ -368,10 +368,17 @@ class TemperaturePlot:
                 return
                 
             # Wyczyść poprzedni profil
+            if hasattr(self, 'profile_scatter') and self.profile_scatter:
+                try:
+                    self.profile_scatter.remove()
+                except ValueError:
+                    pass  # Ignoruj błąd jeśli element nie istnieje
+            self.profile_scatter = None
+            
+            # Zbierz punkty z harmonogramu
             self.profile_times = []
             self.profile_temps = []
             
-            # Zbierz punkty z harmonogramu
             for point in schedule['points']:
                 time_str = point['time']
                 hours, minutes = map(int, time_str.split(':'))
@@ -410,24 +417,14 @@ class TemperaturePlot:
             all_temps.append(self.profile_temps[-1])
             all_colors.append(self.temperature_to_color(self.profile_temps[-1]))
             
-            # Zapisz punkty i kolory
-            self.profile_points = np.column_stack((all_times, all_temps))
-            self.profile_colors = all_colors
+            # Narysuj wszystkie punkty na raz z mniejszą grubością
+            self.profile_scatter = self.ax.scatter(all_times, all_temps, c=all_colors, s=1, marker='.', alpha=0.5)
             
-            # Usuń poprzedni scatter jeśli istnieje
-            if self.profile_scatter is not None:
-                self.profile_scatter.remove()
-            
-            # Narysuj wszystkie punkty na raz
-            self.profile_scatter = self.ax.scatter(all_times, all_temps, c=all_colors, s=1, marker='.')
-            
-            # Odśwież cały wykres
-            self.canvas.draw()
+            # Odśwież wykres
+            self.canvas.draw_idle()
             
         except Exception as e:
             print(f"Błąd przy rysowaniu profilu: {e}")
-            import traceback
-            traceback.print_exc()
 
     def set_title(self, title: str):
         """Ustawia tytuł wykresu."""

@@ -15,12 +15,12 @@
         {
             "time": "02:15",
             "temperature": 1050,
-            "stage": "Holding"
+            "stage": "Glaze firing"
         },
         {
             "time": "02:30",
             "temperature": 1050,
-            "stage": "Holding"
+            "stage": "Soaking"
         },
         {
             "time": "03:00",
